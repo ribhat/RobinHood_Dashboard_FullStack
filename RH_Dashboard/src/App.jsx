@@ -1,50 +1,36 @@
-import { useState, useEffect } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
-import "./App.css";
+import React, { useState, useEffect } from "react";
+import { Container, Row, Col, Dropdown } from "react-bootstrap";
+import HoldingsPieChart from "./Components/HoldingsPieChart";
 import axios from "axios";
+import "bootstrap/dist/css/bootstrap.min.css";
 
 function App() {
-  const [count, setCount] = useState(0);
-  const [array, setArray] = useState([]);
-
-  const fetchAPI = async () => {
-    const response = await axios.get("http://localhost:8080/api/users");
-    console.log(response.data.users);
-    setArray(response.data.users);
-  };
+  const [holdingsData, setHoldingsData] = useState(null);
 
   useEffect(() => {
-    fetchAPI();
+    fetchHoldingsData();
   }, []);
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
+  const fetchHoldingsData = async () => {
+    const response = await fetch("http://localhost:5000/api/holdings");
+    const data = await response.json();
+    console.log(data);
+    setHoldingsData(data);
+  };
 
-        {array.map((user, index) => (
-          <div key={index}>
-            <span> {user}</span>
-            <br></br>
-          </div>
-        ))}
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+  return (
+    <Container fluid>
+      <Row className="justify-content-center mt-3">
+        <Col md={8} className="text-center">
+          <h1>Dividend Dashboard</h1>
+        </Col>
+      </Row>
+      <Row className="mt-4">
+        <Col md={6}>
+          {holdingsData && <HoldingsPieChart data={holdingsData} />}
+        </Col>
+      </Row>
+    </Container>
   );
 }
 
