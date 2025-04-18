@@ -9,6 +9,7 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
   - **Bar Chart**: Visualize overall yearly dividends with a breakdown showing contributions by Month.
   - **Scatter Plot**: Observe total dividends received each month.
   - **Line Graph**: Track the trend of total dividends over time.
+  - **Compare to Previous Year**: Toggle this option to comparatively visualize changes between Years
 - **Interactive Elements**: Switch between different visual representations (Bar, Scatter, Line) for dividend analysis.
 - **Portfolio & Dividend Metrics**: Quick metrics showing current portfolio value and dividends received for the current month/year.
 
