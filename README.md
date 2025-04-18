@@ -68,6 +68,8 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 
 If you'd like to contribute, please fork the repository and use a feature branch. Pull requests are warmly welcome.
 
+## NOTES
+
 NOTE: Changes to Authentication.py in the robin_stocks package -> Robinhood -> authentication.py were made in accordance to: https://github.com/bhyman67/Mods-to-robin-stocks-Authentication/commit/02e5491a9844382c5915180b7bd5321ed98a013b
 
 At the time of this upload (4/15/2025), the default authentication.py is not maintained and will not successfully authenticate
