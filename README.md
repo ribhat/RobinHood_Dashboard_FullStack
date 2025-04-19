@@ -1,6 +1,6 @@
 # Portfolio Dashboard
 
-A comprehensive web dashboard built to visualize and analyze an investment portfolio, leveraging data from Robinhood and presenting insights using Dash and Plotly.
+A comprehensive web dashboard built to visualize and analyze an investment portfolio, leveraging data from Robinhood and presenting insights using React and Flask.
 
 ## Example View
 
