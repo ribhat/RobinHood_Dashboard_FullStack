@@ -2,6 +2,10 @@
 
 A comprehensive web dashboard built to visualize and analyze an investment portfolio, leveraging data from Robinhood and presenting insights using Dash and Plotly.
 
+## Example View
+
+![Dashboard](./Images/DashboardView.png)
+
 ## 🌟 Features
 
 - **Portfolio Allocation Pie Chart**: Get a quick snapshot of the distribution of your investments across various assets.
@@ -63,10 +67,6 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 - Add more metrics like performance comparison to benchmark indices.
 - Implement security features for safer login.
 - Extend to support multiple brokerage accounts.
-
-## Example View
-
-![Dashboard](./Images/DashboardView.png)
 
 ## 🤝 Contributing
 
