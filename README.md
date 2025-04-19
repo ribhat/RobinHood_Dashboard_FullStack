@@ -54,9 +54,9 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 `python <main>.py`
 
 3. Navigate to the RH_Dashboard folder and run the frontend:
-`npm run dev`
+   `npm run dev`
 
-3. Open a web browser and navigate to http://127.0.0.1:8053/ to access the dashboard.
+4. Open a web browser and navigate to http://127.0.0.1:5173/ to access the dashboard.
 
 ## 🌱 Future Enhancements
 
