@@ -60,7 +60,7 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 3. Navigate to the RH_Dashboard folder and run the frontend:
    `npm run dev`
 
-4. Open a web browser and navigate to http://127.0.0.1:5173/ to access the dashboard.
+4. Open a web browser and navigate to http://127.0.0.1:5173/ (or whichever port your computer is running the application on) to access the dashboard.
 
 ## 🌱 Future Enhancements
 
