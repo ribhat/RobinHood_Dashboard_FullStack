@@ -64,6 +64,10 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 - Implement security features for safer login.
 - Extend to support multiple brokerage accounts.
 
+## Example View
+
+![Dashboard](./Images/DashboardView.png)
+
 ## 🤝 Contributing
 
 If you'd like to contribute, please fork the repository and use a feature branch. Pull requests are warmly welcome.
