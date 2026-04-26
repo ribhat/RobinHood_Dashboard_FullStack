@@ -50,42 +50,44 @@ const HoldingsPieChart = ({ data }) => {
   ];
 
   return (
-    <div style={{ height: "500px", width: "800px" }}>
+    <div className="chart-shell holdings-chart-shell">
       <h3 className="text-center">Portfolio Allocation</h3>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={chartData}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            outerRadius={150}
-            fill="#8884d8"
-            dataKey="value"
-            label={({ name, percent }) =>
-              `${name}: ${(percent * 100).toFixed(1)}%`
-            }
-          >
-            {chartData.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={COLORS[index % COLORS.length]}
-              />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value) => {
-              const percentage = ((value / totalEquity) * 100).toFixed(1);
-              return [`$${value.toFixed(2)} (${percentage}%)`, "Value"];
-            }}
-          />
-          <Legend
-            verticalAlign="bottom"
-            height={40}
-            wrapperStyle={{ paddingTop: "0px" }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+      <div className="chart-content">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart margin={{ top: 10, right: 16, bottom: 48, left: 16 }}>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="46%"
+              labelLine={false}
+              outerRadius="62%"
+              fill="#8884d8"
+              dataKey="value"
+              label={({ name, percent }) =>
+                `${name}: ${(percent * 100).toFixed(1)}%`
+              }
+            >
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value) => {
+                const percentage = ((value / totalEquity) * 100).toFixed(1);
+                return [`$${value.toFixed(2)} (${percentage}%)`, "Value"];
+              }}
+            />
+            <Legend
+              verticalAlign="bottom"
+              height={56}
+              wrapperStyle={{ lineHeight: "20px" }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 };

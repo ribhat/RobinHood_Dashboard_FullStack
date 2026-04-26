@@ -66,11 +66,9 @@ def get_dividends():
 @app.route('/api/dividends/yearly/<year>', methods=['GET'])
 def get_yearly_dividends(year):
     try:
-        dividend_data = robin.account.get_dividends()  # Fixed typo here
-        dividends_collected = []
-        
-        for month in months:
-            dividends_collected.append(TotalDivendsForMonth(month, year))
+        dividend_data = robin.account.get_dividends()
+        monthly_totals = dividends_by_month(dividend_data, year)
+        dividends_collected = [monthly_totals[month_conversion_dict[month]] for month in months]
         
         return jsonify({
             'months': months,
@@ -84,27 +82,50 @@ def get_yearly_dividends(year):
 def get_portfolio():
     try:
         profile = robin.profiles.load_portfolio_profile()
+        dividend_data = robin.account.get_dividends()
         current_dt = str(datetime.datetime.now())
         curr_month = current_dt[5:7]
         curr_year = current_dt[0:4]
+        monthly_totals = dividends_by_month(dividend_data, curr_year)
         
         return jsonify({
             'equity': profile['equity'],
-            'dividends_this_month': TotalDivendsForMonth(str(curr_month), curr_year),
-            'dividends_this_year': sum([TotalDivendsForMonth(month, curr_year) for month in months])
+            'dividends_this_month': monthly_totals[curr_month],
+            'dividends_this_year': sum(monthly_totals.values())
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-def TotalDivendsForMonth(month, year):
-    sum = 0
+def normalize_month(month):
     if len(str(month)) != 2:
-        month = month_conversion_dict[month]
-    dividend_data = robin.account.get_dividends()
-    for dictionary in dividend_data:
-        if dictionary['payable_date'][0:7] == str(year) + '-' + str(month) and dictionary['state'] != 'voided':
-            sum += float(dictionary['amount'])
-    return float("%.2f" % sum)
+        return month_conversion_dict[month]
+    return str(month)
+
+def dividends_by_month(dividend_data, year):
+    monthly_totals = {month_conversion_dict[month]: 0 for month in months}
+
+    for dividend in dividend_data:
+        payable_date = dividend.get('payable_date', '')
+        month = payable_date[5:7]
+
+        if (
+            payable_date[0:4] == str(year)
+            and month in monthly_totals
+            and dividend.get('state') != 'voided'
+        ):
+            monthly_totals[month] += float(dividend.get('amount', 0))
+
+    return {
+        month: float("%.2f" % total)
+        for month, total in monthly_totals.items()
+    }
+
+def TotalDivendsForMonth(month, year, dividend_data=None):
+    if dividend_data is None:
+        dividend_data = robin.account.get_dividends()
+
+    normalized_month = normalize_month(month)
+    return dividends_by_month(dividend_data, year)[normalized_month]
 
 if __name__ == '__main__':
     app.run(port=5000)
