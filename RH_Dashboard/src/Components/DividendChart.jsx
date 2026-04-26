@@ -23,25 +23,25 @@ const DividendChart = ({ data, chartType }) => {
   const previousYear = currentYear - 1;
 
   useEffect(() => {
+    const fetchPreviousYearData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/dividends/yearly/${previousYear}`
+        );
+        const data = await response.json();
+        setPreviousYearData(data);
+      } catch (error) {
+        console.error("Error fetching previous year data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     if (comparePreviousYear && !previousYearData) {
       fetchPreviousYearData();
     }
-  }, [comparePreviousYear]);
-
-  const fetchPreviousYearData = async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(
-        `http://localhost:5000/api/dividends/yearly/${previousYear}`
-      );
-      const data = await response.json();
-      setPreviousYearData(data);
-    } catch (error) {
-      console.error("Error fetching previous year data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [comparePreviousYear, previousYear, previousYearData]);
 
   // Prepare chart data
   const chartData = data.months.map((month, index) => {
@@ -58,8 +58,8 @@ const DividendChart = ({ data, chartType }) => {
   });
 
   return (
-    <div style={{ height: "400px" }}>
-      <div className="d-flex justify-content-between align-items-center mb-3">
+    <div className="chart-shell dividend-chart-shell">
+      <div className="chart-card-header">
         <h3 className="text-center mb-0">Dividend Breakdown by Month</h3>
         <Form.Check
           type="switch"
@@ -71,81 +71,94 @@ const DividendChart = ({ data, chartType }) => {
         />
       </div>
       {isLoading ? (
-        <div className="text-center mt-4">Loading previous year data...</div>
+        <div className="chart-loading-state compact-loading-state">
+          Loading previous year data...
+        </div>
       ) : (
-        <ResponsiveContainer width="100%" height="100%">
-          {chartType === "Bar Plot" ? (
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip
-                formatter={(value) => [`$${value.toFixed(2)}`, "Dividends"]}
-              />
-              <Legend />
-              <Bar
-                dataKey={`${currentYear}`}
-                fill="#8884d8"
-                name={`${currentYear}`}
-              />
-              {comparePreviousYear && previousYearData && (
-                <Bar
-                  dataKey={`${previousYear}`}
-                  fill="#82ca9d"
-                  name={`${previousYear}`}
+        <div className="chart-content">
+          <ResponsiveContainer width="100%" height="100%">
+            {chartType === "Bar Plot" ? (
+              <BarChart
+                data={chartData}
+                margin={{ top: 12, right: 20, bottom: 34, left: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value) => [`$${value.toFixed(2)}`, "Dividends"]}
                 />
-              )}
-            </BarChart>
-          ) : chartType === "Line Graph" ? (
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip
-                formatter={(value) => [`$${value.toFixed(2)}`, "Dividends"]}
-              />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey={`${currentYear}`}
-                stroke="#8884d8"
-                activeDot={{ r: 8 }}
-                name={`${currentYear}`}
-              />
-              {comparePreviousYear && previousYearData && (
+                <Legend verticalAlign="bottom" height={36} />
+                <Bar
+                  dataKey={`${currentYear}`}
+                  fill="#8884d8"
+                  name={`${currentYear}`}
+                />
+                {comparePreviousYear && previousYearData && (
+                  <Bar
+                    dataKey={`${previousYear}`}
+                    fill="#82ca9d"
+                    name={`${previousYear}`}
+                  />
+                )}
+              </BarChart>
+            ) : chartType === "Line Graph" ? (
+              <LineChart
+                data={chartData}
+                margin={{ top: 12, right: 20, bottom: 34, left: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value) => [`$${value.toFixed(2)}`, "Dividends"]}
+                />
+                <Legend verticalAlign="bottom" height={36} />
                 <Line
                   type="monotone"
-                  dataKey={`${previousYear}`}
-                  stroke="#82ca9d"
+                  dataKey={`${currentYear}`}
+                  stroke="#8884d8"
                   activeDot={{ r: 8 }}
-                  name={`${previousYear}`}
+                  name={`${currentYear}`}
                 />
-              )}
-            </LineChart>
-          ) : (
-            <ScatterChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip
-                formatter={(value) => [`$${value.toFixed(2)}`, "Dividends"]}
-              />
-              <Legend />
-              <Scatter
-                name={`${currentYear}`}
-                dataKey={`${currentYear}`}
-                fill="#8884d8"
-              />
-              {comparePreviousYear && previousYearData && (
+                {comparePreviousYear && previousYearData && (
+                  <Line
+                    type="monotone"
+                    dataKey={`${previousYear}`}
+                    stroke="#82ca9d"
+                    activeDot={{ r: 8 }}
+                    name={`${previousYear}`}
+                  />
+                )}
+              </LineChart>
+            ) : (
+              <ScatterChart
+                data={chartData}
+                margin={{ top: 12, right: 20, bottom: 34, left: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value) => [`$${value.toFixed(2)}`, "Dividends"]}
+                />
+                <Legend verticalAlign="bottom" height={36} />
                 <Scatter
-                  name={`${previousYear}`}
-                  dataKey={`${previousYear}`}
-                  fill="#82ca9d"
+                  name={`${currentYear}`}
+                  dataKey={`${currentYear}`}
+                  fill="#8884d8"
                 />
-              )}
-            </ScatterChart>
-          )}
-        </ResponsiveContainer>
+                {comparePreviousYear && previousYearData && (
+                  <Scatter
+                    name={`${previousYear}`}
+                    dataKey={`${previousYear}`}
+                    fill="#82ca9d"
+                  />
+                )}
+              </ScatterChart>
+            )}
+          </ResponsiveContainer>
+        </div>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Container, Row, Col, Dropdown, Card } from "react-bootstrap";
 import HoldingsPieChart from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
@@ -6,52 +6,102 @@ import PortfolioSummary from "./Components/PortfolioSummary";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css"; // We'll create this for custom styles
 
+const API_BASE_URL = "http://localhost:5000";
+
 function App() {
   const [chartType, setChartType] = useState("Bar Plot");
   const [portfolioData, setPortfolioData] = useState(null);
   const [holdingsData, setHoldingsData] = useState(null);
-  const [dividendData, setDividendData] = useState(null);
   const [yearlyDividendData, setYearlyDividendData] = useState(null);
+  const [loading, setLoading] = useState({
+    portfolio: true,
+    holdings: true,
+    dividends: true,
+  });
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    // Fetch all data when component mounts
-    fetchPortfolioData();
-    fetchHoldingsData();
-    fetchDividendData();
-    fetchYearlyDividendData();
-  }, []);
+    const fetchJson = async (path) => {
+      const response = await fetch(`${API_BASE_URL}${path}`);
+      const data = await response.json();
 
-  const fetchPortfolioData = async () => {
-    const response = await fetch("http://localhost:5000/api/portfolio");
-    console.log(response);
-    const data = await response.json();
-    setPortfolioData(data);
-  };
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to load dashboard data.");
+      }
 
-  const fetchHoldingsData = async () => {
-    const response = await fetch("http://localhost:5000/api/holdings");
-    console.log(response);
-    const data = await response.json();
-    setHoldingsData(data);
-  };
+      return data;
+    };
 
-  const fetchDividendData = async () => {
-    const response = await fetch("http://localhost:5000/api/dividends");
-    const data = await response.json();
-    setDividendData(data);
-  };
+    const fetchSection = async (section, path, onSuccess) => {
+      try {
+        const data = await fetchJson(path);
+        onSuccess(data);
+      } catch (error) {
+        setErrors((currentErrors) => ({
+          ...currentErrors,
+          [section]: error.message,
+        }));
+      } finally {
+        setLoading((currentLoading) => ({
+          ...currentLoading,
+          [section]: false,
+        }));
+      }
+    };
 
-  const fetchYearlyDividendData = async () => {
     const currentYear = new Date().getFullYear();
-    const response = await fetch(
-      `http://localhost:5000/api/dividends/yearly/${currentYear}`
+
+    fetchSection("portfolio", "/api/portfolio", setPortfolioData);
+    fetchSection("holdings", "/api/holdings", setHoldingsData);
+    fetchSection(
+      "dividends",
+      `/api/dividends/yearly/${currentYear}`,
+      setYearlyDividendData
     );
-    const data = await response.json();
-    setYearlyDividendData(data);
-  };
+  }, []);
 
   const handleChartTypeChange = (type) => {
     setChartType(type);
+  };
+
+  const renderLoadingState = (section) => {
+    if (section === "portfolio") {
+      return (
+        <div className="summary-placeholder-grid">
+          <div className="summary-placeholder-card">
+            <span className="placeholder-label">Portfolio Value</span>
+            <span className="placeholder-line" />
+          </div>
+          <div className="summary-placeholder-card">
+            <span className="placeholder-label">Dividends This Month</span>
+            <span className="placeholder-line" />
+          </div>
+          <div className="summary-placeholder-card">
+            <span className="placeholder-label">Dividends This Year</span>
+            <span className="placeholder-line" />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="chart-loading-state">
+        <div className="loading-ring" aria-hidden="true" />
+        <span>Loading dashboard data...</span>
+      </div>
+    );
+  };
+
+  const renderPanelState = (section, children) => {
+    if (loading[section]) {
+      return renderLoadingState(section);
+    }
+
+    if (errors[section]) {
+      return <div className="panel-state error-state">{errors[section]}</div>;
+    }
+
+    return children;
   };
 
   return (
@@ -72,10 +122,13 @@ function App() {
         <Col md={6} className="mb-4">
           <Card className="h-100 chart-card">
             <Card.Body>
-              <Card.Title className="text-center">
+              <Card.Title className="chart-title text-center">
                 Portfolio Holdings
               </Card.Title>
-              {holdingsData && <HoldingsPieChart data={holdingsData} />}
+              {renderPanelState(
+                "holdings",
+                holdingsData && <HoldingsPieChart data={holdingsData} />
+              )}
             </Card.Body>
           </Card>
         </Col>
@@ -84,11 +137,14 @@ function App() {
         <Col md={6} className="mb-4">
           <Card className="h-100 chart-card">
             <Card.Body>
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <Card.Title>Dividend Performance</Card.Title>
+              <div className="chart-card-header">
+                <Card.Title className="chart-title mb-0">
+                  Dividend Performance
+                </Card.Title>
                 <Dropdown>
                   <Dropdown.Toggle
                     variant="outline-primary"
+                    size="sm"
                     id="dropdown-basic"
                   >
                     {chartType}
@@ -112,11 +168,14 @@ function App() {
                   </Dropdown.Menu>
                 </Dropdown>
               </div>
-              {yearlyDividendData && (
-                <DividendChart
-                  data={yearlyDividendData}
-                  chartType={chartType}
-                />
+              {renderPanelState(
+                "dividends",
+                yearlyDividendData && (
+                  <DividendChart
+                    data={yearlyDividendData}
+                    chartType={chartType}
+                  />
+                )
               )}
             </Card.Body>
           </Card>
@@ -124,17 +183,20 @@ function App() {
       </Row>
 
       {/* Portfolio Summary Section */}
-      {portfolioData && (
-        <Row className="mb-5">
-          <Col md={12}>
-            <PortfolioSummary
-              equity={portfolioData.equity}
-              dividendsThisMonth={portfolioData.dividends_this_month}
-              dividendsThisYear={portfolioData.dividends_this_year}
-            />
-          </Col>
-        </Row>
-      )}
+      <Row className="mb-5">
+        <Col md={12}>
+          {renderPanelState(
+            "portfolio",
+            portfolioData && (
+              <PortfolioSummary
+                equity={portfolioData.equity}
+                dividendsThisMonth={portfolioData.dividends_this_month}
+                dividendsThisYear={portfolioData.dividends_this_year}
+              />
+            )
+          )}
+        </Col>
+      </Row>
     </Container>
   );
 }
