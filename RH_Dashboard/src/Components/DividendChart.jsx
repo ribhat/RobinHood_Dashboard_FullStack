@@ -55,6 +55,16 @@ const DividendChart = ({ data, chartType }) => {
     return monthData;
   });
 
+  const hasDividendData = data.dividends.some((value) => value > 0);
+
+  if (!hasDividendData) {
+    return (
+      <div className="chart-shell dividend-chart-shell">
+        <div className="panel-state">No dividend data available for this year.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="chart-shell dividend-chart-shell">
       <div className="chart-card-header">
