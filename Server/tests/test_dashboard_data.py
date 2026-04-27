@@ -49,6 +49,71 @@ class DashboardDataTests(unittest.TestCase):
         with self.assertRaises(dashboard_data.InvalidInputError):
             dashboard_data.get_instrument_symbol('http://example.com/instruments/abc')
 
+    def test_current_year_position_estimate_excludes_payments_before_open_date(self):
+        positions = [
+            {
+                'symbol': 'FKST',
+                'quantity': '10',
+                'created_at': '2026-05-15T12:00:00Z',
+            },
+        ]
+        dividends = [
+            {
+                'Ticker': 'FKST',
+                'payable_date': '2025-01-10',
+                'rate': '1.00',
+                'amount': '10.00',
+                'state': 'paid',
+            },
+            {
+                'Ticker': 'FKST',
+                'payable_date': '2025-04-10',
+                'rate': '1.00',
+                'amount': '10.00',
+                'state': 'paid',
+            },
+            {
+                'Ticker': 'FKST',
+                'payable_date': '2025-08-10',
+                'rate': '1.00',
+                'amount': '10.00',
+                'state': 'paid',
+            },
+        ]
+
+        estimate = dashboard_data.estimate_current_holdings_income(
+            '2026',
+            '2025',
+            positions,
+            dividends,
+        )
+
+        self.assertEqual(estimate['total'], 10)
+        self.assertEqual(estimate['details'][0]['projected_total'], 10)
+        self.assertEqual(
+            [payment['expected_date'] for payment in estimate['details'][0]['projected_payments']],
+            ['2026-08-10'],
+        )
+
+    def test_current_year_position_estimate_flags_unmodeled_tickers(self):
+        positions = [
+            {
+                'symbol': 'NEW',
+                'quantity': '4',
+                'created_at': '2026-02-01T12:00:00Z',
+            },
+        ]
+
+        estimate = dashboard_data.estimate_current_holdings_income(
+            '2026',
+            '2025',
+            positions,
+            [],
+        )
+
+        self.assertEqual(estimate['total'], 0)
+        self.assertEqual(estimate['unmodeled_tickers'], ['NEW'])
+
 
 class ApiValidationTests(unittest.TestCase):
     def setUp(self):

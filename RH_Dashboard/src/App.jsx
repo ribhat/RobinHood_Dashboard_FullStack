@@ -64,18 +64,10 @@ function App() {
       });
 
       try {
-        const [currentYearData, baselineYearData] = await Promise.all([
-          fetchJson(`/api/dividends/yearly/${currentYear}`),
-          fetchJson(`/api/dividends/yearly/${currentYear - 1}`),
-        ]);
+        const data = await fetchJson("/api/dividends/projection");
 
         if (!ignoreResponse) {
-          setIncomeProjectionData({
-            currentYear,
-            currentYearTotal: currentYearData.total,
-            baselineYear: currentYear - 1,
-            baselineTotal: baselineYearData.total,
-          });
+          setIncomeProjectionData(data);
         }
       } catch (error) {
         if (!ignoreResponse) {
@@ -338,10 +330,7 @@ function App() {
             "incomeProjection",
             incomeProjectionData && (
               <IncomeProjection
-                currentYear={incomeProjectionData.currentYear}
-                currentYearTotal={incomeProjectionData.currentYearTotal}
-                baselineYear={incomeProjectionData.baselineYear}
-                baselineTotal={incomeProjectionData.baselineTotal}
+                data={incomeProjectionData}
               />
             )
           )}
