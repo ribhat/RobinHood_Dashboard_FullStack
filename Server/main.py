@@ -1,7 +1,8 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dashboard_data import (
     InvalidInputError,
+    get_dashboard_snapshot as fetch_dashboard_snapshot,
     get_dividends as fetch_dividends_data,
     get_dividend_projection as fetch_dividend_projection,
     get_holdings as fetch_holdings_data,
@@ -68,6 +69,22 @@ def robinhood_status():
             'authenticated': False,
             'error': robinhood_auth_error or 'Unable to authenticate with Robinhood.'
         }), 503
+
+
+@app.route('/api/dashboard', methods=['GET'])
+def get_dashboard_snapshot():
+    year = request.args.get('year')
+
+    if year is not None:
+        try:
+            validate_year(year)
+        except InvalidInputError as e:
+            return api_error(e, 400)
+
+    def fetch_snapshot():
+        return jsonify(fetch_dashboard_snapshot(year))
+
+    return run_robinhood_request(fetch_snapshot)
 
 # @app.route('/routes')
 # def list_routes():
