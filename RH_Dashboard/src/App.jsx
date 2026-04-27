@@ -17,8 +17,11 @@ function App() {
   const [portfolioData, setPortfolioData] = useState(null);
   const [holdingsData, setHoldingsData] = useState(null);
   const [yearlyDividendData, setYearlyDividendData] = useState(null);
+  const [loadedDividendYear, setLoadedDividendYear] = useState(null);
   const [previousYearDividendData, setPreviousYearDividendData] = useState(null);
   const [incomeProjectionData, setIncomeProjectionData] = useState(null);
+  const [dashboardError, setDashboardError] = useState(null);
+  const [initialDashboardLoaded, setInitialDashboardLoaded] = useState(false);
   const [loading, setLoading] = useState({
     portfolio: true,
     holdings: true,
@@ -28,66 +31,58 @@ function App() {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    const fetchSection = async (section, path, onSuccess) => {
-      try {
-        const data = await fetchJson(path);
-        onSuccess(data);
-      } catch (error) {
-        setErrors((currentErrors) => ({
-          ...currentErrors,
-          [section]: error.message,
-        }));
-      } finally {
-        setLoading((currentLoading) => ({
-          ...currentLoading,
-          [section]: false,
-        }));
-      }
-    };
-
-    fetchSection("portfolio", "/api/portfolio", setPortfolioData);
-    fetchSection("holdings", "/api/holdings", setHoldingsData);
-  }, []);
-
-  useEffect(() => {
     let ignoreResponse = false;
 
-    const fetchIncomeProjection = async () => {
-      setLoading((currentLoading) => ({
-        ...currentLoading,
-        incomeProjection: true,
-      }));
-      setErrors((currentErrors) => {
-        const nextErrors = { ...currentErrors };
-        delete nextErrors.incomeProjection;
-        return nextErrors;
-      });
-
+    const fetchDashboardSnapshot = async () => {
       try {
-        const data = await fetchJson("/api/dividends/projection");
+        const data = await fetchJson(`/api/dashboard?year=${currentYear}`);
 
-        if (!ignoreResponse) {
-          setIncomeProjectionData(data);
+        if (ignoreResponse) {
+          return;
         }
+
+        setPortfolioData(data.portfolio);
+        setHoldingsData(data.holdings);
+        setYearlyDividendData(data.yearly_dividends);
+        setLoadedDividendYear(data.selected_year);
+        setIncomeProjectionData(data.income_projection);
+        setDashboardError(null);
+        setErrors({});
       } catch (error) {
-        if (!ignoreResponse) {
-          setIncomeProjectionData(null);
-          setErrors((currentErrors) => ({
-            ...currentErrors,
-            incomeProjection: error.message,
-          }));
+        if (ignoreResponse) {
+          return;
         }
+
+        setDashboardError({
+          message: error.message,
+          status: error.status,
+        });
+        setPortfolioData(null);
+        setHoldingsData(null);
+        setYearlyDividendData(null);
+        setLoadedDividendYear(null);
+        setIncomeProjectionData(null);
+        setErrors({
+          portfolio: error.message,
+          holdings: error.message,
+          dividends: error.message,
+          incomeProjection: error.message,
+        });
       } finally {
         if (!ignoreResponse) {
-          setLoading((currentLoading) => ({
-            ...currentLoading,
+          setLoading({
+            portfolio: false,
+            holdings: false,
+            dividends: false,
             incomeProjection: false,
-          }));
+            dividendComparison: false,
+          });
+          setInitialDashboardLoaded(true);
         }
       }
     };
 
-    fetchIncomeProjection();
+    fetchDashboardSnapshot();
 
     return () => {
       ignoreResponse = true;
@@ -95,6 +90,14 @@ function App() {
   }, [currentYear]);
 
   useEffect(() => {
+    if (!initialDashboardLoaded) {
+      return undefined;
+    }
+
+    if (selectedYear === loadedDividendYear && yearlyDividendData) {
+      return undefined;
+    }
+
     let ignoreResponse = false;
 
     const fetchDividendYear = async () => {
@@ -113,6 +116,7 @@ function App() {
 
         if (!ignoreResponse) {
           setYearlyDividendData(data);
+          setLoadedDividendYear(selectedYear);
         }
       } catch (error) {
         if (!ignoreResponse) {
@@ -137,7 +141,7 @@ function App() {
     return () => {
       ignoreResponse = true;
     };
-  }, [selectedYear]);
+  }, [initialDashboardLoaded, loadedDividendYear, selectedYear, yearlyDividendData]);
 
   useEffect(() => {
     let ignoreResponse = false;
@@ -250,6 +254,26 @@ function App() {
           <p className="dashboard-subtitle">Track your investments and dividend income</p>
         </Col>
       </Row>
+
+      {dashboardError && (
+        <Row className="dashboard-status-row">
+          <Col md={12}>
+            <div
+              className={`connection-banner ${
+                dashboardError.status === 503 ? "auth-banner" : "error-banner"
+              }`}
+              role="status"
+            >
+              <strong>
+                {dashboardError.status === 503
+                  ? "Robinhood connection unavailable"
+                  : "Dashboard data unavailable"}
+              </strong>
+              <span>{dashboardError.message}</span>
+            </div>
+          </Col>
+        </Row>
+      )}
 
       <Row className="dashboard-main-row">
         <Col lg={5} className="mb-4">

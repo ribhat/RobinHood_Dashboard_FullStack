@@ -23,10 +23,43 @@
 
 .dashboard-main-row,
 .dashboard-projection-row,
-.dashboard-summary-row {
+.dashboard-summary-row,
+.dashboard-status-row {
   max-width: 1440px;
   margin-left: auto;
   margin-right: auto;
+}
+
+.dashboard-status-row {
+  margin-bottom: 1rem;
+}
+
+.connection-banner {
+  align-items: flex-start;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  text-align: left;
+}
+
+.connection-banner strong {
+  color: #18283a;
+}
+
+.connection-banner span {
+  color: #475467;
+}
+
+.auth-banner {
+  background: #fff8e6;
+  border: 1px solid #f7d88a;
+}
+
+.error-banner {
+  background: #fff1f0;
+  border: 1px solid #ffccc7;
 }
 
 .chart-card {
@@ -202,6 +235,79 @@
   color: #667085;
   min-width: 3.5rem;
   text-align: right;
+}
+
+.holdings-table-wrap,
+.projection-table-wrap {
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.holdings-table,
+.projection-table {
+  border-collapse: collapse;
+  min-width: 620px;
+  width: 100%;
+}
+
+.holdings-table th,
+.holdings-table td,
+.projection-table th,
+.projection-table td {
+  border-bottom: 1px solid #eef2f6;
+  padding: 0.75rem;
+  text-align: right;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.holdings-table th:first-child,
+.holdings-table td:first-child,
+.projection-table th:first-child,
+.projection-table td:first-child {
+  text-align: left;
+}
+
+.holdings-table th,
+.projection-table th {
+  background: #f8fafc;
+  color: #667085;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.holdings-table th button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+
+.holdings-table tbody tr:last-child td,
+.projection-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.holdings-table td strong,
+.projection-table td strong {
+  color: #18283a;
+  display: block;
+}
+
+.holdings-table td span,
+.projection-table td span {
+  color: #667085;
+  display: block;
+  font-size: 0.78rem;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-state {
@@ -424,6 +530,42 @@
   margin: 0.85rem 0 0;
 }
 
+.projection-detail {
+  margin-top: 1.1rem;
+}
+
+.payment-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  min-width: 16rem;
+}
+
+.payment-chip {
+  background: #eef6ff;
+  border: 1px solid #cce4ff;
+  border-radius: 999px;
+  color: #145ea8;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1;
+  padding: 0.35rem 0.5rem;
+  white-space: nowrap;
+}
+
+.payment-chip-actual {
+  background: #ecfdf3;
+  border-color: #abefc6;
+  color: #067647;
+}
+
+.projection-table td .payment-chip {
+  display: inline-flex;
+  max-width: none;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -512,5 +654,9 @@
 
   .holding-value {
     display: none;
+  }
+
+  .payment-chip-list {
+    justify-content: flex-start;
   }
 }

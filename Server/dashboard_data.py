@@ -186,14 +186,43 @@ def get_dividend_projection(current_year=None):
     }
 
 
-def estimate_current_holdings_income(current_year, previous_year, positions, dividend_data):
+def get_dashboard_snapshot(year=None):
+    if year is None:
+        year = datetime.datetime.now().year
+
+    year_text = validate_year(year)
+
+    return {
+        "portfolio": get_portfolio(),
+        "holdings": get_holdings(),
+        "yearly_dividends": get_yearly_dividend_summary(year_text),
+        "income_projection": get_dividend_projection(),
+        "selected_year": int(year_text),
+        "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
+
+def estimate_current_holdings_income(
+    current_year,
+    previous_year,
+    positions,
+    dividend_data,
+    as_of_date=None,
+):
     current_year_text = validate_year(current_year)
     previous_year_text = validate_year(previous_year)
     current_year_start = datetime.date(int(current_year_text), 1, 1)
+    if as_of_date is None:
+        as_of_date = datetime.date.today()
     schedule_by_symbol = build_prior_year_dividend_schedule(
         dividend_data,
         previous_year_text,
         current_year_text,
+    )
+    actual_payments_by_symbol = build_current_year_actual_payments(
+        dividend_data,
+        current_year_text,
+        as_of_date,
     )
     estimates = []
     unmodeled_tickers = []
@@ -240,16 +269,13 @@ def estimate_current_holdings_income(current_year, previous_year, positions, div
             include_after = opened_at
         else:
             include_after = current_year_start
-        projected_payments = [
-            {
-                "expected_date": payment["expected_date"].isoformat(),
-                "eligibility_date": payment["eligibility_date"].isoformat(),
-                "rate": payment["rate"],
-                "amount": round(quantity * payment["rate"], 2),
-            }
-            for payment in payment_schedule
-            if payment["eligibility_date"] >= include_after
-        ]
+        projected_payments = build_position_payment_outlook(
+            ticker,
+            quantity,
+            payment_schedule,
+            actual_payments_by_symbol.get(ticker, {}),
+            include_after,
+        )
         projected_total = round(
             sum(payment["amount"] for payment in projected_payments),
             2,
@@ -277,6 +303,92 @@ def estimate_current_holdings_income(current_year, previous_year, positions, div
         "rate_limited_tickers": sorted(rate_limited_tickers),
         "details": estimates,
     }
+
+
+def build_current_year_actual_payments(dividend_data, current_year, as_of_date=None):
+    current_year_text = validate_year(current_year)
+    if as_of_date is None:
+        as_of_date = datetime.date.today()
+    actual_payments = defaultdict(lambda: defaultdict(lambda: {
+        "amount": 0,
+        "dates": [],
+    }))
+
+    for dividend in dividend_data:
+        if dividend.get("state") == "voided":
+            continue
+
+        payable_date = parse_date(dividend.get("payable_date"))
+        amount = parse_float(dividend.get("amount"))
+
+        if (
+            not payable_date
+            or str(payable_date.year) != current_year_text
+            or payable_date > as_of_date
+            or amount <= 0
+        ):
+            continue
+
+        symbol = get_dividend_symbol(dividend)
+
+        if not symbol:
+            continue
+
+        month = f"{payable_date.month:02d}"
+        actual_payments[symbol][month]["amount"] += amount
+        actual_payments[symbol][month]["dates"].append(payable_date)
+
+    return {
+        symbol: {
+            month: {
+                "amount": round(payment["amount"], 2),
+                "dates": sorted(payment["dates"]),
+            }
+            for month, payment in monthly_payments.items()
+        }
+        for symbol, monthly_payments in actual_payments.items()
+    }
+
+
+def build_position_payment_outlook(
+    ticker,
+    quantity,
+    payment_schedule,
+    actual_payments_by_month,
+    include_after,
+):
+    payments = []
+
+    for payment in payment_schedule:
+        if payment["eligibility_date"] < include_after:
+            continue
+
+        payment_month = f"{payment['expected_date'].month:02d}"
+        actual_payment = actual_payments_by_month.get(payment_month)
+
+        if actual_payment:
+            payment_dates = actual_payment["dates"]
+            payments.append({
+                "expected_date": payment["expected_date"].isoformat(),
+                "actual_date": payment_dates[-1].isoformat(),
+                "eligibility_date": payment["eligibility_date"].isoformat(),
+                "rate": payment["rate"],
+                "amount": actual_payment["amount"],
+                "source": "actual",
+                "label": "Received",
+            })
+            continue
+
+        payments.append({
+            "expected_date": payment["expected_date"].isoformat(),
+            "eligibility_date": payment["eligibility_date"].isoformat(),
+            "rate": payment["rate"],
+            "amount": round(quantity * payment["rate"], 2),
+            "source": "estimate",
+            "label": "Estimated",
+        })
+
+    return payments
 
 
 def build_prior_year_dividend_schedule(dividend_data, previous_year, current_year):
