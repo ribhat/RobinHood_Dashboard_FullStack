@@ -56,9 +56,12 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 ```text
 RH_USERNAME=your_robinhood_username
 RH_PASSWORD=your_robinhood_password
+POLYGON_API_KEY=optional_polygon_free_api_key
 ```
 
 The `.env` file is ignored by git and should not be committed. The app also stores Robinhood session tokens in `.tokens/`, which is ignored by git as well.
+
+`POLYGON_API_KEY` is optional. When present, the backend can use Polygon's free dividend corporate-actions endpoint as a fallback for current holdings without a Robinhood dividend history. The app limits fallback lookups to stay below Polygon's free request limit and caches results for 24 hours.
 
 5. Optionally configure the frontend API URL:
 

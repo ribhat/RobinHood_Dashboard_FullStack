@@ -13,6 +13,8 @@ const IncomeProjection = ({ data }) => {
   const hasExceededPreviousYear =
     currentYearCollected >= previousYearTotal && previousYearTotal > 0;
   const unmodeledTickers = currentHoldingsEstimate.unmodeled_tickers || [];
+  const externalLookupUsed = currentHoldingsEstimate.external_lookup_used || [];
+  const rateLimitedTickers = currentHoldingsEstimate.rate_limited_tickers || [];
 
   return (
     <section className="projection-card" aria-label="Dividend income projection">
@@ -92,6 +94,16 @@ const IncomeProjection = ({ data }) => {
         {unmodeledTickers.length > 0 && (
           <p className="projection-note">
             No prior-year dividend schedule was found for {unmodeledTickers.join(", ")}.
+          </p>
+        )}
+        {externalLookupUsed.length > 0 && (
+          <p className="projection-note">
+            Polygon fallback supplied schedules for {externalLookupUsed.join(", ")}.
+          </p>
+        )}
+        {rateLimitedTickers.length > 0 && (
+          <p className="projection-note">
+            Polygon fallback skipped {rateLimitedTickers.join(", ")} to stay under the free request limit.
           </p>
         )}
       </div>
