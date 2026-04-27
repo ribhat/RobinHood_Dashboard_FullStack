@@ -1,6 +1,7 @@
 import datetime
 import re
 import time
+from collections import defaultdict
 from urllib.parse import urlparse
 
 import requests
@@ -78,6 +79,10 @@ def get_holdings():
     return dashboard_cache.get_or_set("holdings", robin.build_holdings)
 
 
+def get_open_positions():
+    return dashboard_cache.get_or_set("open_positions", robin.get_open_stock_positions)
+
+
 def get_quote(ticker):
     ticker_text = validate_ticker(ticker)
 
@@ -140,6 +145,175 @@ def get_yearly_dividend_summary(year):
         'dividends': dividends_collected,
         'total': sum(dividends_collected),
     }
+
+
+def get_dividend_projection(current_year=None):
+    if current_year is None:
+        current_year = datetime.datetime.now().year
+
+    current_year_text = validate_year(current_year)
+    previous_year_text = str(int(current_year_text) - 1)
+    current_year_total = get_yearly_dividend_summary(current_year_text)["total"]
+    previous_year_total = get_yearly_dividend_summary(previous_year_text)["total"]
+    current_holdings_estimate = estimate_current_holdings_income(
+        current_year_text,
+        previous_year_text,
+        get_open_positions(),
+        get_dividend_records(),
+    )
+
+    return {
+        "current_year": int(current_year_text),
+        "current_year_collected": current_year_total,
+        "previous_year": int(previous_year_text),
+        "previous_year_actual_total": previous_year_total,
+        "previous_year_monthly_average": round(previous_year_total / 12, 2),
+        "remaining_to_previous_year_actual": round(
+            max(previous_year_total - current_year_total, 0),
+            2,
+        ),
+        "current_holdings_estimate": current_holdings_estimate,
+    }
+
+
+def estimate_current_holdings_income(current_year, previous_year, positions, dividend_data):
+    current_year_text = validate_year(current_year)
+    previous_year_text = validate_year(previous_year)
+    current_year_start = datetime.date(int(current_year_text), 1, 1)
+    schedule_by_symbol = build_prior_year_dividend_schedule(
+        dividend_data,
+        previous_year_text,
+        current_year_text,
+    )
+    estimates = []
+    unmodeled_tickers = []
+
+    for position in positions:
+        symbol = position.get("symbol")
+
+        if not symbol:
+            continue
+
+        ticker = validate_ticker(symbol)
+        quantity = parse_float(position.get("quantity"))
+        payment_schedule = schedule_by_symbol.get(ticker, [])
+
+        if quantity <= 0:
+            continue
+
+        if not payment_schedule:
+            unmodeled_tickers.append(ticker)
+            continue
+
+        opened_at = parse_date(position.get("created_at")) or current_year_start
+        if opened_at.year > int(current_year_text):
+            include_after = datetime.date(int(current_year_text), 12, 31) + datetime.timedelta(days=1)
+        elif opened_at.year == int(current_year_text):
+            include_after = opened_at
+        else:
+            include_after = current_year_start
+        projected_payments = [
+            {
+                "expected_date": payment["expected_date"].isoformat(),
+                "rate": payment["rate"],
+                "amount": round(quantity * payment["rate"], 2),
+            }
+            for payment in payment_schedule
+            if payment["expected_date"] >= include_after
+        ]
+        projected_total = round(
+            sum(payment["amount"] for payment in projected_payments),
+            2,
+        )
+
+        estimates.append({
+            "ticker": ticker,
+            "quantity": quantity,
+            "opened_at": opened_at.isoformat(),
+            "projected_total": projected_total,
+            "projected_payments": projected_payments,
+        })
+
+    estimates.sort(key=lambda estimate: estimate["projected_total"], reverse=True)
+    total = round(sum(estimate["projected_total"] for estimate in estimates), 2)
+
+    return {
+        "total": total,
+        "monthly_average": round(total / 12, 2),
+        "modeled_ticker_count": len(estimates),
+        "unmodeled_tickers": sorted(unmodeled_tickers),
+        "details": estimates,
+    }
+
+
+def build_prior_year_dividend_schedule(dividend_data, previous_year, current_year):
+    schedule_by_symbol = defaultdict(list)
+
+    for dividend in dividend_data:
+        if dividend.get("state") == "voided":
+            continue
+
+        payable_date = parse_date(dividend.get("payable_date"))
+        rate = parse_float(dividend.get("rate"))
+
+        if not payable_date or str(payable_date.year) != str(previous_year) or rate <= 0:
+            continue
+
+        symbol = get_dividend_symbol(dividend)
+
+        if not symbol:
+            continue
+
+        schedule_by_symbol[symbol].append({
+            "expected_date": replace_year(payable_date, int(current_year)),
+            "rate": rate,
+        })
+
+    for symbol, payments in schedule_by_symbol.items():
+        schedule_by_symbol[symbol] = sorted(
+            payments,
+            key=lambda payment: payment["expected_date"],
+        )
+
+    return schedule_by_symbol
+
+
+def get_dividend_symbol(dividend):
+    symbol = dividend.get("Ticker") or dividend.get("symbol")
+
+    if symbol:
+        return validate_ticker(symbol)
+
+    instrument_url = dividend.get("instrument")
+
+    if not instrument_url:
+        return None
+
+    return validate_ticker(get_instrument_symbol(instrument_url))
+
+
+def replace_year(date_value, year):
+    try:
+        return date_value.replace(year=year)
+    except ValueError:
+        return date_value.replace(year=year, day=28)
+
+
+def parse_date(date_text):
+    if not date_text:
+        return None
+
+    try:
+        return datetime.date.fromisoformat(str(date_text)[:10])
+    except ValueError:
+        return None
+
+
+def parse_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def get_portfolio():

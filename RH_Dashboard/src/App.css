@@ -22,6 +22,7 @@
 }
 
 .dashboard-main-row,
+.dashboard-projection-row,
 .dashboard-summary-row {
   max-width: 1440px;
   margin-left: auto;
@@ -312,6 +313,117 @@
   overflow-wrap: anywhere;
 }
 
+.projection-card {
+  background: #ffffff;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+  margin-bottom: 1.5rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+}
+
+.projection-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.projection-header h2 {
+  color: #18283a;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.2;
+  margin: 0.25rem 0 0;
+}
+
+.projection-basis {
+  background: #eef6ff;
+  border: 1px solid #cce4ff;
+  border-radius: 999px;
+  color: #145ea8;
+  font-size: 0.85rem;
+  font-weight: 650;
+  padding: 0.35rem 0.65rem;
+  white-space: nowrap;
+}
+
+.projection-section + .projection-section {
+  border-top: 1px solid #e5eaf1;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+}
+
+.projection-section-header {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+
+.projection-section-header h3 {
+  color: #24364b;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.projection-section-header span {
+  color: #667085;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.projection-grid {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1.35fr) repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.projection-primary,
+.projection-metric {
+  background: #f8fafc;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  min-height: 104px;
+  padding: 1rem;
+}
+
+.projection-primary strong,
+.projection-metric strong {
+  color: #18283a;
+  display: block;
+  font-size: clamp(1.35rem, 2.4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+.projection-progress {
+  background: #edf2f7;
+  border-radius: 999px;
+  height: 0.65rem;
+  margin-top: 1rem;
+  overflow: hidden;
+}
+
+.projection-progress-bar {
+  background: #0f8b5f;
+  border-radius: inherit;
+  height: 100%;
+  min-width: 0.35rem;
+}
+
+.projection-note {
+  color: #667085;
+  font-size: 0.9rem;
+  margin: 0.85rem 0 0;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -347,6 +459,24 @@
 
   .dividend-chart-summary {
     grid-template-columns: 1fr;
+  }
+
+  .projection-header {
+    flex-direction: column;
+  }
+
+  .projection-section-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .projection-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .projection-basis {
+    white-space: normal;
   }
 
   .chart-card {

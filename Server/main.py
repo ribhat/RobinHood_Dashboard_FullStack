@@ -3,6 +3,7 @@ from flask_cors import CORS
 from dashboard_data import (
     InvalidInputError,
     get_dividends as fetch_dividends_data,
+    get_dividend_projection as fetch_dividend_projection,
     get_holdings as fetch_holdings_data,
     get_portfolio as fetch_portfolio_data,
     get_quote as fetch_quote_data,
@@ -116,6 +117,13 @@ def get_yearly_dividends(year):
         return jsonify(fetch_yearly_dividend_summary(year))
 
     return run_robinhood_request(fetch_yearly_dividends)
+
+@app.route('/api/dividends/projection', methods=['GET'])
+def get_dividend_projection():
+    def fetch_projection():
+        return jsonify(fetch_dividend_projection())
+
+    return run_robinhood_request(fetch_projection)
 
 @app.route('/api/portfolio', methods=['GET'])
 def get_portfolio():
