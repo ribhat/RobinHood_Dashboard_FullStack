@@ -14,6 +14,7 @@ import {
   Scatter,
 } from "recharts";
 import { Form } from "react-bootstrap";
+import { fetchJson } from "../api";
 
 const DividendChart = ({ data, chartType }) => {
   const [comparePreviousYear, setComparePreviousYear] = useState(false);
@@ -26,10 +27,7 @@ const DividendChart = ({ data, chartType }) => {
     const fetchPreviousYearData = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(
-          `http://localhost:5000/api/dividends/yearly/${previousYear}`
-        );
-        const data = await response.json();
+        const data = await fetchJson(`/api/dividends/yearly/${previousYear}`);
         setPreviousYearData(data);
       } catch (error) {
         console.error("Error fetching previous year data:", error);
