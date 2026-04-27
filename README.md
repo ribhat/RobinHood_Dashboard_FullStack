@@ -47,7 +47,18 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 
 `pip install -r requirements.txt`
 
-3. Save your Robinhood credentials in RHCredentials.txt or directly in the code (not recommended for security reasons).
+3. Create your local environment file:
+
+`copy .env.example .env`
+
+4. Open `.env` and fill in your Robinhood credentials:
+
+```text
+RH_USERNAME=your_robinhood_username
+RH_PASSWORD=your_robinhood_password
+```
+
+The `.env` file is ignored by git and should not be committed. The app also stores Robinhood session tokens in `.tokens/`, which is ignored by git as well.
 
 ## Running the App
 
@@ -55,7 +66,7 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 
 2. Navigate to Server folder and run the Flask Server:
 
-`python <main>.py`
+`python main.py`
 
 3. Navigate to the RH_Dashboard folder and run the frontend:
    `npm run dev`

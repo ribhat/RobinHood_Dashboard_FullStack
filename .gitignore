@@ -3,6 +3,8 @@ __pycache__/
 *.log
 
 .env
+.tokens/
+RHCredentials.txt
 .venv/
 venv/
 
