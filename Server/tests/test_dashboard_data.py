@@ -17,6 +17,8 @@ class DashboardDataTests(unittest.TestCase):
         dashboard_data.dashboard_cache.clear()
         dashboard_data.quote_cache.clear()
         dashboard_data.symbol_cache.clear()
+        dashboard_data.polygon_dividend_cache.clear()
+        dashboard_data.polygon_request_timestamps.clear()
 
     def test_dividends_by_month_ignores_voided_and_rounds(self):
         dividends = [
@@ -94,6 +96,67 @@ class DashboardDataTests(unittest.TestCase):
             [payment['expected_date'] for payment in estimate['details'][0]['projected_payments']],
             ['2026-08-10'],
         )
+
+    @patch.dict('os.environ', {'POLYGON_API_KEY': 'test-key'})
+    @patch('dashboard_data.fetch_polygon_dividend_schedule')
+    def test_current_year_position_estimate_uses_external_schedule_for_unmodeled_ticker(
+        self,
+        mock_fetch_schedule,
+    ):
+        mock_fetch_schedule.return_value = [
+            {
+                'expected_date': dashboard_data.parse_date('2026-08-10'),
+                'eligibility_date': dashboard_data.parse_date('2026-08-01'),
+                'rate': 1.5,
+            },
+        ]
+        positions = [
+            {
+                'symbol': 'NEW',
+                'quantity': '4',
+                'created_at': '2026-02-01T12:00:00Z',
+            },
+        ]
+
+        estimate = dashboard_data.estimate_current_holdings_income(
+            '2026',
+            '2025',
+            positions,
+            [],
+        )
+
+        self.assertEqual(estimate['total'], 6)
+        self.assertEqual(estimate['external_lookup_used'], ['NEW'])
+        self.assertEqual(estimate['unmodeled_tickers'], [])
+
+    def test_polygon_request_budget_stops_before_free_limit(self):
+        for _ in range(dashboard_data.POLYGON_FREE_REQUESTS_PER_MINUTE):
+            dashboard_data.consume_polygon_request_budget()
+
+        with self.assertRaises(dashboard_data.ExternalRateLimitReached):
+            dashboard_data.consume_polygon_request_budget()
+
+    @patch.dict('os.environ', {'POLYGON_API_KEY': 'test-key'})
+    @patch('dashboard_data.fetch_polygon_dividend_schedule')
+    def test_external_provider_error_keeps_ticker_unmodeled(self, mock_fetch_schedule):
+        mock_fetch_schedule.side_effect = dashboard_data.requests.RequestException()
+        positions = [
+            {
+                'symbol': 'NEW',
+                'quantity': '4',
+                'created_at': '2026-02-01T12:00:00Z',
+            },
+        ]
+
+        estimate = dashboard_data.estimate_current_holdings_income(
+            '2026',
+            '2025',
+            positions,
+            [],
+        )
+
+        self.assertEqual(estimate['total'], 0)
+        self.assertEqual(estimate['unmodeled_tickers'], ['NEW'])
 
     def test_current_year_position_estimate_flags_unmodeled_tickers(self):
         positions = [

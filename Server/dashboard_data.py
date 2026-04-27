@@ -1,4 +1,5 @@
 import datetime
+import os
 import re
 import time
 from collections import defaultdict
@@ -14,11 +15,18 @@ CACHE_TTL_SECONDS = 90
 QUOTE_CACHE_TTL_SECONDS = 15
 SYMBOL_CACHE_TTL_SECONDS = 24 * 60 * 60
 INSTRUMENT_REQUEST_TIMEOUT_SECONDS = 10
+POLYGON_DIVIDEND_CACHE_TTL_SECONDS = 24 * 60 * 60
+POLYGON_FREE_REQUESTS_PER_MINUTE = 4
+POLYGON_REQUEST_TIMEOUT_SECONDS = 10
 TICKER_PATTERN = re.compile(r"^[A-Za-z0-9.-]{1,12}$")
 ALLOWED_INSTRUMENT_HOSTS = {"api.robinhood.com", "nummus.robinhood.com"}
 
 
 class InvalidInputError(ValueError):
+    pass
+
+
+class ExternalRateLimitReached(Exception):
     pass
 
 
@@ -48,6 +56,8 @@ class TTLCache:
 dashboard_cache = TTLCache(CACHE_TTL_SECONDS)
 quote_cache = TTLCache(QUOTE_CACHE_TTL_SECONDS)
 symbol_cache = TTLCache(SYMBOL_CACHE_TTL_SECONDS)
+polygon_dividend_cache = TTLCache(POLYGON_DIVIDEND_CACHE_TTL_SECONDS)
+polygon_request_timestamps = []
 
 
 def validate_year(year):
@@ -187,6 +197,8 @@ def estimate_current_holdings_income(current_year, previous_year, positions, div
     )
     estimates = []
     unmodeled_tickers = []
+    rate_limited_tickers = []
+    external_lookup_used = []
 
     for position in positions:
         symbol = position.get("symbol")
@@ -202,8 +214,24 @@ def estimate_current_holdings_income(current_year, previous_year, positions, div
             continue
 
         if not payment_schedule:
-            unmodeled_tickers.append(ticker)
-            continue
+            try:
+                payment_schedule = get_external_dividend_schedule(
+                    ticker,
+                    previous_year_text,
+                    current_year_text,
+                )
+            except ExternalRateLimitReached:
+                rate_limited_tickers.append(ticker)
+                continue
+            except requests.RequestException:
+                unmodeled_tickers.append(ticker)
+                continue
+
+            if payment_schedule:
+                external_lookup_used.append(ticker)
+            else:
+                unmodeled_tickers.append(ticker)
+                continue
 
         opened_at = parse_date(position.get("created_at")) or current_year_start
         if opened_at.year > int(current_year_text):
@@ -215,11 +243,12 @@ def estimate_current_holdings_income(current_year, previous_year, positions, div
         projected_payments = [
             {
                 "expected_date": payment["expected_date"].isoformat(),
+                "eligibility_date": payment["eligibility_date"].isoformat(),
                 "rate": payment["rate"],
                 "amount": round(quantity * payment["rate"], 2),
             }
             for payment in payment_schedule
-            if payment["expected_date"] >= include_after
+            if payment["eligibility_date"] >= include_after
         ]
         projected_total = round(
             sum(payment["amount"] for payment in projected_payments),
@@ -242,6 +271,10 @@ def estimate_current_holdings_income(current_year, previous_year, positions, div
         "monthly_average": round(total / 12, 2),
         "modeled_ticker_count": len(estimates),
         "unmodeled_tickers": sorted(unmodeled_tickers),
+        "external_lookup_enabled": bool(os.getenv("POLYGON_API_KEY")),
+        "external_lookup_source": "Polygon",
+        "external_lookup_used": sorted(external_lookup_used),
+        "rate_limited_tickers": sorted(rate_limited_tickers),
         "details": estimates,
     }
 
@@ -266,6 +299,10 @@ def build_prior_year_dividend_schedule(dividend_data, previous_year, current_yea
 
         schedule_by_symbol[symbol].append({
             "expected_date": replace_year(payable_date, int(current_year)),
+            "eligibility_date": replace_year(
+                parse_date(dividend.get("ex_dividend_date")) or payable_date,
+                int(current_year),
+            ),
             "rate": rate,
         })
 
@@ -276,6 +313,71 @@ def build_prior_year_dividend_schedule(dividend_data, previous_year, current_yea
         )
 
     return schedule_by_symbol
+
+
+def get_external_dividend_schedule(ticker, previous_year, current_year):
+    if not os.getenv("POLYGON_API_KEY"):
+        return []
+
+    return polygon_dividend_cache.get_or_set(
+        f"polygon:{ticker}:{previous_year}:{current_year}",
+        lambda: fetch_polygon_dividend_schedule(ticker, previous_year, current_year),
+    )
+
+
+def fetch_polygon_dividend_schedule(ticker, previous_year, current_year):
+    consume_polygon_request_budget()
+    response = requests.get(
+        "https://api.polygon.io/v3/reference/dividends",
+        params={
+            "ticker": ticker,
+            "pay_date.gte": f"{previous_year}-01-01",
+            "pay_date.lte": f"{previous_year}-12-31",
+            "limit": 1000,
+            "apiKey": os.getenv("POLYGON_API_KEY"),
+        },
+        timeout=POLYGON_REQUEST_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    dividends = response.json().get("results", [])
+    schedule = []
+
+    for dividend in dividends:
+        rate = parse_float(dividend.get("cash_amount"))
+        expected_date = parse_date(
+            dividend.get("pay_date") or dividend.get("ex_dividend_date")
+        )
+        eligibility_date = parse_date(
+            dividend.get("ex_dividend_date") or dividend.get("pay_date")
+        )
+
+        if rate <= 0 or not expected_date or not eligibility_date:
+            continue
+
+        schedule.append({
+            "expected_date": replace_year(expected_date, int(current_year)),
+            "eligibility_date": replace_year(eligibility_date, int(current_year)),
+            "rate": rate,
+        })
+
+    return sorted(schedule, key=lambda payment: payment["expected_date"])
+
+
+def consume_polygon_request_budget():
+    now = time.monotonic()
+    one_minute_ago = now - 60
+    recent_timestamps = [
+        timestamp
+        for timestamp in polygon_request_timestamps
+        if timestamp > one_minute_ago
+    ]
+    polygon_request_timestamps.clear()
+    polygon_request_timestamps.extend(recent_timestamps)
+
+    if len(polygon_request_timestamps) >= POLYGON_FREE_REQUESTS_PER_MINUTE:
+        raise ExternalRateLimitReached()
+
+    polygon_request_timestamps.append(now)
 
 
 def get_dividend_symbol(dividend):
