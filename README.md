@@ -78,6 +78,8 @@ The default frontend API URL is `http://localhost:5000`, so this step is only ne
 
 The Flask server exposes `/api/health` for a lightweight server check and `/api/robinhood/status` for Robinhood authentication status.
 
+Portfolio, holdings, and dividend data are cached briefly by the backend to reduce repeated Robinhood calls while keeping dashboard data fresh.
+
 3. Navigate to the RH_Dashboard folder and run the frontend:
    `npm run dev`
 
