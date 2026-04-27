@@ -1,39 +1,34 @@
 import React from "react";
-import { Container, Row, Col, Dropdown } from "react-bootstrap";
-import { Card } from "react-bootstrap";
 
 const PortfolioSummary = ({
   equity,
   dividendsThisMonth,
   dividendsThisYear,
 }) => {
+  const metrics = [
+    {
+      label: "Portfolio Value",
+      value: `$${parseFloat(equity).toFixed(2)}`,
+    },
+    {
+      label: "Dividends This Month",
+      value: `$${dividendsThisMonth.toFixed(2)}`,
+    },
+    {
+      label: "Dividends This Year",
+      value: `$${dividendsThisYear.toFixed(2)}`,
+    },
+  ];
+
   return (
-    <Row className="mt-4">
-      <Col md={4}>
-        <Card>
-          <Card.Body>
-            <Card.Title>Portfolio Value</Card.Title>
-            <Card.Text>${parseFloat(equity).toFixed(2)}</Card.Text>
-          </Card.Body>
-        </Card>
-      </Col>
-      <Col md={4}>
-        <Card>
-          <Card.Body>
-            <Card.Title>Dividends This Month</Card.Title>
-            <Card.Text>${dividendsThisMonth.toFixed(2)}</Card.Text>
-          </Card.Body>
-        </Card>
-      </Col>
-      <Col md={4}>
-        <Card>
-          <Card.Body>
-            <Card.Title>Dividends This Year</Card.Title>
-            <Card.Text>${dividendsThisYear.toFixed(2)}</Card.Text>
-          </Card.Body>
-        </Card>
-      </Col>
-    </Row>
+    <section className="summary-grid" aria-label="Portfolio summary">
+      {metrics.map((metric) => (
+        <div className="summary-card" key={metric.label}>
+          <span className="summary-label">{metric.label}</span>
+          <strong className="summary-value">{metric.value}</strong>
+        </div>
+      ))}
+    </section>
   );
 };
 

@@ -1,31 +1,47 @@
 /* App.css */
 .dashboard-container {
   width: 100%;
-  padding: 1.5rem 2rem 2.5rem;
-  background-color: #f8f9fa;
+  padding: 2rem clamp(1rem, 4vw, 3rem) 3rem;
+  background: #f6f8fb;
   min-height: 100vh;
+}
+
+.dashboard-header {
+  margin-bottom: 1.5rem;
 }
 
 .dashboard-title {
   font-weight: 600;
-  color: #2c3e50;
+  color: #18283a;
   margin-bottom: 0.5rem;
 }
 
+.dashboard-subtitle {
+  color: #667085;
+  margin-bottom: 0;
+}
+
+.dashboard-main-row,
+.dashboard-summary-row {
+  max-width: 1440px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .chart-card {
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  border: none;
-  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #e5eaf1;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+  overflow: visible;
 }
 
 .chart-card .card-body {
-  padding: 1.5rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
 }
 
 .chart-card .card-title {
   font-weight: 500;
-  color: #34495e;
+  color: #24364b;
   margin-bottom: 1.5rem;
 }
 
@@ -39,6 +55,7 @@
 
 .chart-title {
   line-height: 1.25;
+  text-align: left;
 }
 
 .chart-shell {
@@ -50,7 +67,8 @@
 }
 
 .holdings-chart-shell {
-  height: 520px;
+  height: auto;
+  min-height: 520px;
 }
 
 .dividend-chart-shell {
@@ -63,6 +81,54 @@
   width: 100%;
 }
 
+.holdings-chart-content {
+  flex: 0 0 260px;
+  height: 260px;
+  min-height: 260px;
+}
+
+.holdings-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.holding-row {
+  display: grid;
+  grid-template-columns: 0.75rem minmax(3rem, 1fr) auto auto;
+  align-items: center;
+  column-gap: 0.6rem;
+  min-height: 2rem;
+  color: #344054;
+  font-size: 0.92rem;
+}
+
+.holding-color {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+}
+
+.holding-name {
+  color: #18283a;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.holding-value,
+.holding-percent {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.holding-percent {
+  color: #667085;
+  min-width: 3.5rem;
+  text-align: right;
+}
+
 .panel-state {
   display: flex;
   align-items: center;
@@ -71,6 +137,10 @@
   color: #5d6d7e;
   font-weight: 500;
   text-align: center;
+  background: #f8fafc;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  padding: 1rem;
 }
 
 .chart-loading-state {
@@ -98,7 +168,6 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.5rem;
-  margin-top: 1.5rem;
 }
 
 .summary-placeholder-card {
@@ -135,6 +204,40 @@
   padding: 1rem;
 }
 
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  min-height: 116px;
+  padding: 1.25rem;
+  background: #ffffff;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.summary-label {
+  display: block;
+  color: #667085;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+
+.summary-value {
+  color: #18283a;
+  display: block;
+  font-size: clamp(1.65rem, 3vw, 2.25rem);
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -154,7 +257,7 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .dashboard-container {
-    padding: 0 1rem;
+    padding: 1.25rem 1rem 2rem;
   }
 
   .chart-card-header {
@@ -179,7 +282,21 @@
     height: 420px;
   }
 
-  .summary-placeholder-grid {
+  .holdings-chart-shell {
+    height: auto;
+    min-height: 500px;
+  }
+
+  .summary-placeholder-grid,
+  .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .holding-row {
+    grid-template-columns: 0.75rem minmax(2rem, 1fr) auto;
+  }
+
+  .holding-value {
+    display: none;
   }
 }

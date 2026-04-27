@@ -94,25 +94,18 @@ function App() {
 
   return (
     <Container fluid className="dashboard-container">
-      {/* Header Section */}
-      <Row className="justify-content-center my-4">
+      <Row className="justify-content-center dashboard-header">
         <Col md={10} className="text-center">
           <h1 className="dashboard-title">Dividend Dashboard</h1>
-          <p className="text-muted">
-            Track your investments and dividend income
-          </p>
+          <p className="dashboard-subtitle">Track your investments and dividend income</p>
         </Col>
       </Row>
 
-      {/* Main Content Section */}
-      <Row className="mb-4">
-        {/* Holdings Chart Card */}
-        <Col md={6} className="mb-4">
+      <Row className="dashboard-main-row">
+        <Col lg={5} className="mb-4">
           <Card className="h-100 chart-card">
             <Card.Body>
-              <Card.Title className="chart-title text-center">
-                Portfolio Holdings
-              </Card.Title>
+              <Card.Title className="chart-title">Portfolio Allocation</Card.Title>
               {renderPanelState(
                 "holdings",
                 holdingsData && <HoldingsPieChart data={holdingsData} />
@@ -121,8 +114,7 @@ function App() {
           </Card>
         </Col>
 
-        {/* Dividend Chart Card */}
-        <Col md={6} className="mb-4">
+        <Col lg={7} className="mb-4">
           <Card className="h-100 chart-card">
             <Card.Body>
               <div className="chart-card-header">
@@ -170,8 +162,7 @@ function App() {
         </Col>
       </Row>
 
-      {/* Portfolio Summary Section */}
-      <Row className="mb-5">
+      <Row className="dashboard-summary-row">
         <Col md={12}>
           {renderPanelState(
             "portfolio",
