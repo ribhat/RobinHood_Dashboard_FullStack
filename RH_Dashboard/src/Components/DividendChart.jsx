@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   BarChart,
   Bar,
@@ -13,43 +13,28 @@ import {
   ScatterChart,
   Scatter,
 } from "recharts";
-import { Form } from "react-bootstrap";
-import { fetchJson } from "../api";
 
-const DividendChart = ({ data, chartType }) => {
-  const [comparePreviousYear, setComparePreviousYear] = useState(false);
-  const [previousYearData, setPreviousYearData] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const currentYear = new Date().getFullYear();
-  const previousYear = currentYear - 1;
+const DividendChart = ({
+  data,
+  comparisonData,
+  chartType,
+  selectedYear,
+  comparePreviousYear,
+  isComparisonLoading,
+}) => {
+  const comparisonYear = selectedYear - 1;
+  const selectedYearTotal = data.total ?? data.dividends.reduce((sum, value) => sum + value, 0);
+  const selectedYearAverage = selectedYearTotal / data.dividends.length;
+  const comparisonTotal = comparisonData?.total ?? null;
 
-  useEffect(() => {
-    const fetchPreviousYearData = async () => {
-      setIsLoading(true);
-      try {
-        const data = await fetchJson(`/api/dividends/yearly/${previousYear}`);
-        setPreviousYearData(data);
-      } catch (error) {
-        console.error("Error fetching previous year data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (comparePreviousYear && !previousYearData) {
-      fetchPreviousYearData();
-    }
-  }, [comparePreviousYear, previousYear, previousYearData]);
-
-  // Prepare chart data
   const chartData = data.months.map((month, index) => {
     const monthData = {
       month,
-      [`${currentYear}`]: data.dividends[index],
+      [`${selectedYear}`]: data.dividends[index],
     };
 
-    if (comparePreviousYear && previousYearData) {
-      monthData[`${previousYear}`] = previousYearData.dividends[index];
+    if (comparePreviousYear && comparisonData) {
+      monthData[`${comparisonYear}`] = comparisonData.dividends[index];
     }
 
     return monthData;
@@ -67,20 +52,25 @@ const DividendChart = ({ data, chartType }) => {
 
   return (
     <div className="chart-shell dividend-chart-shell">
-      <div className="chart-card-header">
-        <h3 className="text-center mb-0">Dividend Breakdown by Month</h3>
-        <Form.Check
-          type="switch"
-          id="compare-year-switch"
-          label={`Compare with ${previousYear}`}
-          checked={comparePreviousYear}
-          onChange={() => setComparePreviousYear(!comparePreviousYear)}
-          disabled={isLoading}
-        />
+      <div className="dividend-chart-summary">
+        <div>
+          <span className="metric-kicker">{selectedYear} Total</span>
+          <strong>${selectedYearTotal.toFixed(2)}</strong>
+        </div>
+        <div>
+          <span className="metric-kicker">Monthly Average</span>
+          <strong>${selectedYearAverage.toFixed(2)}</strong>
+        </div>
+        {comparePreviousYear && comparisonTotal !== null && (
+          <div>
+            <span className="metric-kicker">{comparisonYear} Total</span>
+            <strong>${comparisonTotal.toFixed(2)}</strong>
+          </div>
+        )}
       </div>
-      {isLoading ? (
+      {isComparisonLoading ? (
         <div className="chart-loading-state compact-loading-state">
-          Loading previous year data...
+          Loading comparison data...
         </div>
       ) : (
         <div className="chart-content">
@@ -98,15 +88,15 @@ const DividendChart = ({ data, chartType }) => {
                 />
                 <Legend verticalAlign="bottom" height={36} />
                 <Bar
-                  dataKey={`${currentYear}`}
+                  dataKey={`${selectedYear}`}
                   fill="#8884d8"
-                  name={`${currentYear}`}
+                  name={`${selectedYear}`}
                 />
-                {comparePreviousYear && previousYearData && (
+                {comparePreviousYear && comparisonData && (
                   <Bar
-                    dataKey={`${previousYear}`}
+                    dataKey={`${comparisonYear}`}
                     fill="#82ca9d"
-                    name={`${previousYear}`}
+                    name={`${comparisonYear}`}
                   />
                 )}
               </BarChart>
@@ -124,18 +114,18 @@ const DividendChart = ({ data, chartType }) => {
                 <Legend verticalAlign="bottom" height={36} />
                 <Line
                   type="monotone"
-                  dataKey={`${currentYear}`}
+                  dataKey={`${selectedYear}`}
                   stroke="#8884d8"
                   activeDot={{ r: 8 }}
-                  name={`${currentYear}`}
+                  name={`${selectedYear}`}
                 />
-                {comparePreviousYear && previousYearData && (
+                {comparePreviousYear && comparisonData && (
                   <Line
                     type="monotone"
-                    dataKey={`${previousYear}`}
+                    dataKey={`${comparisonYear}`}
                     stroke="#82ca9d"
                     activeDot={{ r: 8 }}
-                    name={`${previousYear}`}
+                    name={`${comparisonYear}`}
                   />
                 )}
               </LineChart>
@@ -152,14 +142,14 @@ const DividendChart = ({ data, chartType }) => {
                 />
                 <Legend verticalAlign="bottom" height={36} />
                 <Scatter
-                  name={`${currentYear}`}
-                  dataKey={`${currentYear}`}
+                  name={`${selectedYear}`}
+                  dataKey={`${selectedYear}`}
                   fill="#8884d8"
                 />
-                {comparePreviousYear && previousYearData && (
+                {comparePreviousYear && comparisonData && (
                   <Scatter
-                    name={`${previousYear}`}
-                    dataKey={`${previousYear}`}
+                    name={`${comparisonYear}`}
+                    dataKey={`${comparisonYear}`}
                     fill="#82ca9d"
                   />
                 )}

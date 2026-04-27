@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Container, Row, Col, Dropdown, Card } from "react-bootstrap";
+import { Container, Row, Col, Card, Form } from "react-bootstrap";
 import HoldingsPieChart from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
 import PortfolioSummary from "./Components/PortfolioSummary";
@@ -8,10 +8,15 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css"; // We'll create this for custom styles
 
 function App() {
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 6 }, (_, index) => currentYear - index);
   const [chartType, setChartType] = useState("Bar Plot");
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [comparePreviousYear, setComparePreviousYear] = useState(false);
   const [portfolioData, setPortfolioData] = useState(null);
   const [holdingsData, setHoldingsData] = useState(null);
   const [yearlyDividendData, setYearlyDividendData] = useState(null);
+  const [previousYearDividendData, setPreviousYearDividendData] = useState(null);
   const [loading, setLoading] = useState({
     portfolio: true,
     holdings: true,
@@ -37,19 +42,116 @@ function App() {
       }
     };
 
-    const currentYear = new Date().getFullYear();
-
     fetchSection("portfolio", "/api/portfolio", setPortfolioData);
     fetchSection("holdings", "/api/holdings", setHoldingsData);
-    fetchSection(
-      "dividends",
-      `/api/dividends/yearly/${currentYear}`,
-      setYearlyDividendData
-    );
   }, []);
 
-  const handleChartTypeChange = (type) => {
-    setChartType(type);
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    const fetchDividendYear = async () => {
+      setLoading((currentLoading) => ({
+        ...currentLoading,
+        dividends: true,
+      }));
+      setErrors((currentErrors) => {
+        const nextErrors = { ...currentErrors };
+        delete nextErrors.dividends;
+        return nextErrors;
+      });
+
+      try {
+        const data = await fetchJson(`/api/dividends/yearly/${selectedYear}`);
+
+        if (!ignoreResponse) {
+          setYearlyDividendData(data);
+        }
+      } catch (error) {
+        if (!ignoreResponse) {
+          setYearlyDividendData(null);
+          setErrors((currentErrors) => ({
+            ...currentErrors,
+            dividends: error.message,
+          }));
+        }
+      } finally {
+        if (!ignoreResponse) {
+          setLoading((currentLoading) => ({
+            ...currentLoading,
+            dividends: false,
+          }));
+        }
+      }
+    };
+
+    fetchDividendYear();
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, [selectedYear]);
+
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    const fetchComparisonYear = async () => {
+      if (!comparePreviousYear) {
+        setPreviousYearDividendData(null);
+        setLoading((currentLoading) => ({
+          ...currentLoading,
+          dividendComparison: false,
+        }));
+        setErrors((currentErrors) => {
+          const nextErrors = { ...currentErrors };
+          delete nextErrors.dividendComparison;
+          return nextErrors;
+        });
+        return;
+      }
+
+      setLoading((currentLoading) => ({
+        ...currentLoading,
+        dividendComparison: true,
+      }));
+      setErrors((currentErrors) => {
+        const nextErrors = { ...currentErrors };
+        delete nextErrors.dividendComparison;
+        return nextErrors;
+      });
+
+      try {
+        const data = await fetchJson(`/api/dividends/yearly/${selectedYear - 1}`);
+
+        if (!ignoreResponse) {
+          setPreviousYearDividendData(data);
+        }
+      } catch (error) {
+        if (!ignoreResponse) {
+          setPreviousYearDividendData(null);
+          setErrors((currentErrors) => ({
+            ...currentErrors,
+            dividendComparison: error.message,
+          }));
+        }
+      } finally {
+        if (!ignoreResponse) {
+          setLoading((currentLoading) => ({
+            ...currentLoading,
+            dividendComparison: false,
+          }));
+        }
+      }
+    };
+
+    fetchComparisonYear();
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, [comparePreviousYear, selectedYear]);
+
+  const handleYearChange = (event) => {
+    setSelectedYear(Number(event.target.value));
   };
 
   const renderLoadingState = (section) => {
@@ -118,42 +220,54 @@ function App() {
           <Card className="h-100 chart-card">
             <Card.Body>
               <div className="chart-card-header">
-                <Card.Title className="chart-title mb-0">
-                  Dividend Performance
-                </Card.Title>
-                <Dropdown>
-                  <Dropdown.Toggle
-                    variant="outline-primary"
+                <Card.Title className="chart-title mb-0">Dividend Performance</Card.Title>
+                <div className="dividend-controls">
+                  <Form.Select
+                    aria-label="Dividend year"
+                    className="year-select"
                     size="sm"
-                    id="dropdown-basic"
+                    value={selectedYear}
+                    onChange={handleYearChange}
                   >
-                    {chartType}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    <Dropdown.Item
-                      onClick={() => handleChartTypeChange("Bar Plot")}
-                    >
-                      Bar Plot
-                    </Dropdown.Item>
-                    <Dropdown.Item
-                      onClick={() => handleChartTypeChange("Scatter Plot")}
-                    >
-                      Scatter Plot
-                    </Dropdown.Item>
-                    <Dropdown.Item
-                      onClick={() => handleChartTypeChange("Line Graph")}
-                    >
-                      Line Graph
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
+                    {yearOptions.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </Form.Select>
+                  <Form.Select
+                    aria-label="Dividend chart type"
+                    className="chart-type-select"
+                    size="sm"
+                    value={chartType}
+                    onChange={(event) => setChartType(event.target.value)}
+                  >
+                    <option value="Bar Plot">Bar Plot</option>
+                    <option value="Scatter Plot">Scatter Plot</option>
+                    <option value="Line Graph">Line Graph</option>
+                  </Form.Select>
+                  <Form.Check
+                    type="switch"
+                    id="compare-year-switch"
+                    label={`Compare ${selectedYear - 1}`}
+                    checked={comparePreviousYear}
+                    onChange={() => setComparePreviousYear((currentValue) => !currentValue)}
+                  />
+                </div>
               </div>
+              {errors.dividendComparison && !loading.dividendComparison && (
+                <div className="comparison-error">{errors.dividendComparison}</div>
+              )}
               {renderPanelState(
                 "dividends",
                 yearlyDividendData && (
                   <DividendChart
                     data={yearlyDividendData}
+                    comparisonData={previousYearDividendData}
                     chartType={chartType}
+                    selectedYear={selectedYear}
+                    comparePreviousYear={comparePreviousYear}
+                    isComparisonLoading={loading.dividendComparison}
                   />
                 )
               )}
