@@ -3,6 +3,7 @@ import { Container, Row, Col, Card, Form } from "react-bootstrap";
 import HoldingsPieChart from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
 import PortfolioSummary from "./Components/PortfolioSummary";
+import IncomeProjection from "./Components/IncomeProjection";
 import { fetchJson } from "./api";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css"; // We'll create this for custom styles
@@ -17,10 +18,12 @@ function App() {
   const [holdingsData, setHoldingsData] = useState(null);
   const [yearlyDividendData, setYearlyDividendData] = useState(null);
   const [previousYearDividendData, setPreviousYearDividendData] = useState(null);
+  const [incomeProjectionData, setIncomeProjectionData] = useState(null);
   const [loading, setLoading] = useState({
     portfolio: true,
     holdings: true,
     dividends: true,
+    incomeProjection: true,
   });
   const [errors, setErrors] = useState({});
 
@@ -45,6 +48,59 @@ function App() {
     fetchSection("portfolio", "/api/portfolio", setPortfolioData);
     fetchSection("holdings", "/api/holdings", setHoldingsData);
   }, []);
+
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    const fetchIncomeProjection = async () => {
+      setLoading((currentLoading) => ({
+        ...currentLoading,
+        incomeProjection: true,
+      }));
+      setErrors((currentErrors) => {
+        const nextErrors = { ...currentErrors };
+        delete nextErrors.incomeProjection;
+        return nextErrors;
+      });
+
+      try {
+        const [currentYearData, baselineYearData] = await Promise.all([
+          fetchJson(`/api/dividends/yearly/${currentYear}`),
+          fetchJson(`/api/dividends/yearly/${currentYear - 1}`),
+        ]);
+
+        if (!ignoreResponse) {
+          setIncomeProjectionData({
+            currentYear,
+            currentYearTotal: currentYearData.total,
+            baselineYear: currentYear - 1,
+            baselineTotal: baselineYearData.total,
+          });
+        }
+      } catch (error) {
+        if (!ignoreResponse) {
+          setIncomeProjectionData(null);
+          setErrors((currentErrors) => ({
+            ...currentErrors,
+            incomeProjection: error.message,
+          }));
+        }
+      } finally {
+        if (!ignoreResponse) {
+          setLoading((currentLoading) => ({
+            ...currentLoading,
+            incomeProjection: false,
+          }));
+        }
+      }
+    };
+
+    fetchIncomeProjection();
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, [currentYear]);
 
   useEffect(() => {
     let ignoreResponse = false;
@@ -273,6 +329,22 @@ function App() {
               )}
             </Card.Body>
           </Card>
+        </Col>
+      </Row>
+
+      <Row className="dashboard-projection-row">
+        <Col md={12}>
+          {renderPanelState(
+            "incomeProjection",
+            incomeProjectionData && (
+              <IncomeProjection
+                currentYear={incomeProjectionData.currentYear}
+                currentYearTotal={incomeProjectionData.currentYearTotal}
+                baselineYear={incomeProjectionData.baselineYear}
+                baselineTotal={incomeProjectionData.baselineTotal}
+              />
+            )
+          )}
         </Col>
       </Row>
 
