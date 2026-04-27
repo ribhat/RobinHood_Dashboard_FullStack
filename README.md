@@ -60,6 +60,14 @@ RH_PASSWORD=your_robinhood_password
 
 The `.env` file is ignored by git and should not be committed. The app also stores Robinhood session tokens in `.tokens/`, which is ignored by git as well.
 
+5. Optionally configure the frontend API URL:
+
+```text
+copy RH_Dashboard\.env.example RH_Dashboard\.env
+```
+
+The default frontend API URL is `http://localhost:5000`, so this step is only needed when the Flask API runs somewhere else.
+
 ## Running the App
 
 1. In the terminal, navigate to the project directory.
@@ -67,6 +75,8 @@ The `.env` file is ignored by git and should not be committed. The app also stor
 2. Navigate to Server folder and run the Flask Server:
 
 `python main.py`
+
+The Flask server exposes `/api/health` for a lightweight server check and `/api/robinhood/status` for Robinhood authentication status.
 
 3. Navigate to the RH_Dashboard folder and run the frontend:
    `npm run dev`

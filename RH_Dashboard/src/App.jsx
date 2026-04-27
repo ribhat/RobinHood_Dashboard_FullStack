@@ -3,10 +3,9 @@ import { Container, Row, Col, Dropdown, Card } from "react-bootstrap";
 import HoldingsPieChart from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
 import PortfolioSummary from "./Components/PortfolioSummary";
+import { fetchJson } from "./api";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css"; // We'll create this for custom styles
-
-const API_BASE_URL = "http://localhost:5000";
 
 function App() {
   const [chartType, setChartType] = useState("Bar Plot");
@@ -21,17 +20,6 @@ function App() {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    const fetchJson = async (path) => {
-      const response = await fetch(`${API_BASE_URL}${path}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Unable to load dashboard data.");
-      }
-
-      return data;
-    };
-
     const fetchSection = async (section, path, onSuccess) => {
       try {
         const data = await fetchJson(path);
