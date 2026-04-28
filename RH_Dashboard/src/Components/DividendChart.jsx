@@ -24,7 +24,13 @@ const DividendChart = ({
 }) => {
   const comparisonYear = selectedYear - 1;
   const selectedYearTotal = data.total ?? data.dividends.reduce((sum, value) => sum + value, 0);
-  const selectedYearAverage = selectedYearTotal / data.dividends.length;
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const elapsedMonths = selectedYear === currentYear
+    ? Math.min(today.getMonth() + 1, data.dividends.length)
+    : data.dividends.length;
+  const averageMonthCount = Math.max(elapsedMonths, 1);
+  const selectedYearAverage = selectedYearTotal / averageMonthCount;
   const comparisonTotal = comparisonData?.total ?? null;
 
   const chartData = data.months.map((month, index) => {

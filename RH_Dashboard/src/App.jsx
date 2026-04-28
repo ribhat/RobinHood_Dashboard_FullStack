@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Col, Container, Form, Row } from "react-bootstrap";
-import HoldingsPieChart from "./Components/HoldingsPieChart";
+import HoldingsPieChart, { HoldingsTable } from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
 import PortfolioSummary from "./Components/PortfolioSummary";
 import IncomeProjection from "./Components/IncomeProjection";
@@ -510,6 +510,20 @@ function App() {
                     isComparisonLoading={loading.dividendComparison}
                   />
                 )
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      <Row className="dashboard-holdings-row">
+        <Col md={12}>
+          <Card className="chart-card holdings-table-card">
+            <Card.Body>
+              <Card.Title className="chart-title">Holdings Details</Card.Title>
+              {renderPanelState(
+                "holdings",
+                holdingsData && <HoldingsTable data={holdingsData} />
               )}
             </Card.Body>
           </Card>

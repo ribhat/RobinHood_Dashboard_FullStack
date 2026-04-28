@@ -8,10 +8,6 @@ import {
 } from "recharts";
 
 const HoldingsPieChart = ({ data }) => {
-  const [sortConfig, setSortConfig] = useState({
-    key: "equity",
-    direction: "desc",
-  });
   // Convert data to array and sort by equity in descending order
   let chartData = Object.entries(data)
     .map(([ticker, details]) => ({
@@ -22,33 +18,6 @@ const HoldingsPieChart = ({ data }) => {
 
   // Calculate total equity for all holdings
   const totalEquity = chartData.reduce((sum, item) => sum + item.value, 0);
-  const holdingsRows = useMemo(() => {
-    const rows = Object.entries(data).map(([ticker, details]) => {
-      const equity = Number(details.equity || 0);
-
-      return {
-        ticker,
-        name: details.name || ticker,
-        quantity: Number(details.quantity || 0),
-        equity,
-        price: Number(details.price || details.current_price || 0),
-        averageBuyPrice: Number(details.average_buy_price || 0),
-        weight: totalEquity > 0 ? (equity / totalEquity) * 100 : 0,
-      };
-    });
-
-    return rows.sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-      const direction = sortConfig.direction === "asc" ? 1 : -1;
-
-      if (typeof aValue === "string") {
-        return aValue.localeCompare(bValue) * direction;
-      }
-
-      return (aValue - bValue) * direction;
-    });
-  }, [data, sortConfig, totalEquity]);
 
   if (!chartData.length || totalEquity === 0) {
     return (
@@ -86,20 +55,6 @@ const HoldingsPieChart = ({ data }) => {
     "#A4DE6C",
     "#D0ED57",
   ];
-  const requestSort = (key) => {
-    setSortConfig((currentSort) => ({
-      key,
-      direction:
-        currentSort.key === key && currentSort.direction === "desc" ? "asc" : "desc",
-    }));
-  };
-  const renderSortLabel = (label, key) => {
-    if (sortConfig.key !== key) {
-      return label;
-    }
-
-    return `${label} (${sortConfig.direction})`;
-  };
 
   return (
     <div className="chart-shell holdings-chart-shell">
@@ -149,7 +104,64 @@ const HoldingsPieChart = ({ data }) => {
           );
         })}
       </div>
-      <div className="holdings-table-wrap">
+    </div>
+  );
+};
+
+export const HoldingsTable = ({ data }) => {
+  const [sortConfig, setSortConfig] = useState({
+    key: "equity",
+    direction: "desc",
+  });
+  const totalEquity = Object.values(data).reduce(
+    (sum, details) => sum + Number(details.equity || 0),
+    0
+  );
+  const holdingsRows = useMemo(() => {
+    const rows = Object.entries(data).map(([ticker, details]) => {
+      const equity = Number(details.equity || 0);
+
+      return {
+        ticker,
+        name: details.name || ticker,
+        quantity: Number(details.quantity || 0),
+        equity,
+        price: Number(details.price || details.current_price || 0),
+        averageBuyPrice: Number(details.average_buy_price || 0),
+        weight: totalEquity > 0 ? (equity / totalEquity) * 100 : 0,
+      };
+    });
+
+    return rows.sort((a, b) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+      const direction = sortConfig.direction === "asc" ? 1 : -1;
+
+      if (typeof aValue === "string") {
+        return aValue.localeCompare(bValue) * direction;
+      }
+
+      return (aValue - bValue) * direction;
+    });
+  }, [data, sortConfig, totalEquity]);
+
+  const requestSort = (key) => {
+    setSortConfig((currentSort) => ({
+      key,
+      direction:
+        currentSort.key === key && currentSort.direction === "desc" ? "asc" : "desc",
+    }));
+  };
+  const renderSortLabel = (label, key) => {
+    if (sortConfig.key !== key) {
+      return label;
+    }
+
+    return `${label} (${sortConfig.direction})`;
+  };
+
+  return (
+      <div className="holdings-table-wrap" aria-label="Holdings details">
         <table className="holdings-table">
           <thead>
             <tr>
@@ -202,7 +214,6 @@ const HoldingsPieChart = ({ data }) => {
           </tbody>
         </table>
       </div>
-    </div>
   );
 };
 
