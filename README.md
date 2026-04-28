@@ -47,19 +47,17 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 
 `pip install -r requirements.txt`
 
-3. Create your local environment file:
+3. Create your local environment file if you want to enable optional Polygon dividend fallback lookups:
 
 `copy .env.example .env`
 
-4. Open `.env` and fill in your Robinhood credentials:
+4. Open `.env` and add a Polygon API key if you have one:
 
 ```text
-RH_USERNAME=your_robinhood_username
-RH_PASSWORD=your_robinhood_password
 POLYGON_API_KEY=optional_polygon_free_api_key
 ```
 
-The `.env` file is ignored by git and should not be committed. The app also stores Robinhood session tokens in `.tokens/`, which is ignored by git as well.
+The `.env` file is ignored by git and should not be committed. Robinhood credentials are entered in the local login page at runtime and are not stored by the app.
 
 `POLYGON_API_KEY` is optional. When present, the backend can use Polygon's free dividend corporate-actions endpoint as a fallback for current holdings without a Robinhood dividend history. The app limits fallback lookups to stay below Polygon's free request limit and caches results for 24 hours.
 
@@ -79,7 +77,7 @@ The default frontend API URL is `http://localhost:5000`, so this step is only ne
 
 `python main.py`
 
-The Flask server exposes `/api/health` for a lightweight server check and `/api/robinhood/status` for Robinhood authentication status.
+The Flask server exposes `/api/health` for a lightweight server check and `/api/auth/status` for Robinhood authentication status. Use the frontend login page to start a session with your Robinhood username, password, and optional MFA code.
 
 Portfolio, holdings, and dividend data are cached briefly by the backend to reduce repeated Robinhood calls while keeping dashboard data fresh.
 

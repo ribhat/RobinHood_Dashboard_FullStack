@@ -14,11 +14,7 @@ import main
 
 class DashboardDataTests(unittest.TestCase):
     def tearDown(self):
-        dashboard_data.dashboard_cache.clear()
-        dashboard_data.quote_cache.clear()
-        dashboard_data.symbol_cache.clear()
-        dashboard_data.polygon_dividend_cache.clear()
-        dashboard_data.polygon_request_timestamps.clear()
+        dashboard_data.clear_dashboard_caches()
 
     def test_dividends_by_month_ignores_voided_and_rounds(self):
         dividends = [
@@ -420,7 +416,14 @@ class DashboardDataTests(unittest.TestCase):
 
 class ApiValidationTests(unittest.TestCase):
     def setUp(self):
+        main.robinhood_login = None
+        main.robinhood_auth_error = None
         self.client = main.app.test_client()
+
+    def tearDown(self):
+        main.robinhood_login = None
+        main.robinhood_auth_error = None
+        dashboard_data.clear_dashboard_caches()
 
     def test_health_check_does_not_require_robinhood_auth(self):
         response = self.client.get('/api/health')
@@ -444,13 +447,11 @@ class ApiValidationTests(unittest.TestCase):
         self.assertIn('Ticker must be', response.get_json()['error'])
         mock_login.assert_not_called()
 
-    @patch('main.ensure_robinhood_login', side_effect=RuntimeError('auth failed'))
-    def test_auth_failure_returns_503(self, mock_login):
+    def test_unauthenticated_portfolio_returns_401(self):
         response = self.client.get('/api/portfolio')
 
-        self.assertEqual(response.status_code, 503)
-        self.assertIn('auth failed', response.get_json()['error'])
-        mock_login.assert_called_once()
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('Log in to Robinhood', response.get_json()['error'])
 
     @patch('main.ensure_robinhood_login')
     def test_dashboard_invalid_year_returns_400_without_auth_attempt(self, mock_login):
@@ -483,6 +484,97 @@ class ApiValidationTests(unittest.TestCase):
         self.assertEqual(response.get_json()['selected_year'], 2026)
         mock_login.assert_called_once()
         mock_snapshot.assert_called_once_with('2026')
+
+
+class ApiAuthTests(unittest.TestCase):
+    def setUp(self):
+        main.robinhood_login = None
+        main.robinhood_auth_error = None
+        self.client = main.app.test_client()
+
+    def tearDown(self):
+        main.robinhood_login = None
+        main.robinhood_auth_error = None
+        dashboard_data.clear_dashboard_caches()
+
+    @patch('main.login_to_robinhood')
+    def test_auth_status_does_not_trigger_login(self, mock_login):
+        response = self.client.get('/api/auth/status')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'authenticated': False})
+        mock_login.assert_not_called()
+
+    @patch('main.clear_dashboard_caches')
+    @patch('main.login_to_robinhood')
+    def test_login_success_sets_session_and_clears_caches(
+        self,
+        mock_login,
+        mock_clear_caches,
+    ):
+        mock_login.return_value = {'access_token': 'token'}
+
+        response = self.client.post(
+            '/api/auth/login',
+            json={
+                'username': 'user@example.com',
+                'password': 'secret',
+                'mfa_code': '123456',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'authenticated': True})
+        self.assertEqual(main.robinhood_login, {'access_token': 'token'})
+        mock_login.assert_called_once_with('user@example.com', 'secret', '123456')
+        mock_clear_caches.assert_called_once()
+
+    @patch('main.login_to_robinhood')
+    def test_login_failure_returns_401(self, mock_login):
+        mock_login.side_effect = main.RobinhoodAuthError('bad credentials')
+
+        response = self.client.post(
+            '/api/auth/login',
+            json={'username': 'user@example.com', 'password': 'wrong'},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json()['error'], 'bad credentials')
+        self.assertFalse(main.is_robinhood_authenticated())
+
+    @patch('main.login_to_robinhood')
+    def test_login_verification_required_returns_409(self, mock_login):
+        mock_login.side_effect = main.RobinhoodVerificationRequired('MFA required')
+
+        response = self.client.post(
+            '/api/auth/login',
+            json={'username': 'user@example.com', 'password': 'secret'},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.get_json()['error'], 'MFA required')
+        self.assertFalse(main.is_robinhood_authenticated())
+
+    @patch('main.clear_dashboard_caches')
+    @patch('main.logout_from_robinhood')
+    def test_logout_clears_session_and_caches(self, mock_logout, mock_clear_caches):
+        main.robinhood_login = {'access_token': 'token'}
+
+        response = self.client.post('/api/auth/logout')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'authenticated': False})
+        self.assertFalse(main.is_robinhood_authenticated())
+        mock_logout.assert_called_once()
+        mock_clear_caches.assert_called_once()
+
+    @patch('main.fetch_dashboard_snapshot')
+    def test_unauthenticated_dashboard_access_returns_401(self, mock_snapshot):
+        response = self.client.get('/api/dashboard?year=2026')
+
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('Log in to Robinhood', response.get_json()['error'])
+        mock_snapshot.assert_not_called()
 
 
 if __name__ == '__main__':

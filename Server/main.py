@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dashboard_data import (
     InvalidInputError,
+    clear_dashboard_caches,
     get_dashboard_snapshot as fetch_dashboard_snapshot,
     get_dividends as fetch_dividends_data,
     get_dividend_projection as fetch_dividend_projection,
@@ -12,28 +13,47 @@ from dashboard_data import (
     validate_ticker,
     validate_year,
 )
-from robinhood_auth import login_to_robinhood
+from robinhood_auth import (
+    RobinhoodAuthError,
+    RobinhoodVerificationRequired,
+    login_to_robinhood,
+    logout_from_robinhood,
+)
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for React frontend
+CORS(app)
 
 robinhood_login = None
 robinhood_auth_error = None
 
 
-def ensure_robinhood_login():
-    global robinhood_login, robinhood_auth_error
+class AuthenticationRequired(Exception):
+    pass
 
+
+def is_robinhood_authenticated():
+    return robinhood_login is not None
+
+
+def ensure_robinhood_login():
     if robinhood_login:
         return robinhood_login
 
-    try:
-        robinhood_login = login_to_robinhood()
-        robinhood_auth_error = None
-        return robinhood_login
-    except Exception as e:
-        robinhood_auth_error = str(e)
-        raise
+    raise AuthenticationRequired("Log in to Robinhood to load dashboard data.")
+
+
+def set_robinhood_session(login_response):
+    global robinhood_login, robinhood_auth_error
+    robinhood_login = login_response
+    robinhood_auth_error = None
+
+
+def clear_robinhood_session():
+    global robinhood_login, robinhood_auth_error
+    robinhood_login = None
+    robinhood_auth_error = None
+    logout_from_robinhood()
+    clear_dashboard_caches()
 
 
 def api_error(error, status=500):
@@ -43,15 +63,15 @@ def api_error(error, status=500):
 def run_robinhood_request(callback):
     try:
         ensure_robinhood_login()
-    except Exception as e:
-        return api_error(e, 503)
+    except AuthenticationRequired as error:
+        return api_error(error, 401)
 
     try:
         return callback()
-    except InvalidInputError as e:
-        return api_error(e, 400)
-    except Exception as e:
-        return api_error(e)
+    except InvalidInputError as error:
+        return api_error(error, 400)
+    except Exception as error:
+        return api_error(error)
 
 
 @app.route('/api/health', methods=['GET'])
@@ -59,16 +79,47 @@ def health_check():
     return jsonify({'status': 'ok'})
 
 
+@app.route('/api/auth/status', methods=['GET'])
+def auth_status():
+    response = {'authenticated': is_robinhood_authenticated()}
+
+    if not response['authenticated'] and robinhood_auth_error:
+        response['error'] = robinhood_auth_error
+
+    return jsonify(response)
+
+
 @app.route('/api/robinhood/status', methods=['GET'])
 def robinhood_status():
+    return auth_status()
+
+
+@app.route('/api/auth/login', methods=['POST'])
+def auth_login():
+    global robinhood_auth_error
+    payload = request.get_json(silent=True) or {}
+
     try:
-        ensure_robinhood_login()
+        login_response = login_to_robinhood(
+            payload.get('username'),
+            payload.get('password'),
+            payload.get('mfa_code'),
+        )
+        set_robinhood_session(login_response)
+        clear_dashboard_caches()
         return jsonify({'authenticated': True})
-    except Exception:
-        return jsonify({
-            'authenticated': False,
-            'error': robinhood_auth_error or 'Unable to authenticate with Robinhood.'
-        }), 503
+    except RobinhoodVerificationRequired as error:
+        robinhood_auth_error = str(error)
+        return api_error(error, 409)
+    except RobinhoodAuthError as error:
+        robinhood_auth_error = str(error)
+        return api_error(error, 401)
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def auth_logout():
+    clear_robinhood_session()
+    return jsonify({'authenticated': False})
 
 
 @app.route('/api/dashboard', methods=['GET'])
@@ -78,13 +129,14 @@ def get_dashboard_snapshot():
     if year is not None:
         try:
             validate_year(year)
-        except InvalidInputError as e:
-            return api_error(e, 400)
+        except InvalidInputError as error:
+            return api_error(error, 400)
 
     def fetch_snapshot():
         return jsonify(fetch_dashboard_snapshot(year))
 
     return run_robinhood_request(fetch_snapshot)
+
 
 # @app.route('/routes')
 # def list_routes():
@@ -104,17 +156,19 @@ def get_holdings():
 
     return run_robinhood_request(fetch_holdings)
 
+
 @app.route('/api/quote/<ticker>', methods=['GET'])
 def get_quote(ticker):
     try:
         validate_ticker(ticker)
-    except InvalidInputError as e:
-        return api_error(e, 400)
+    except InvalidInputError as error:
+        return api_error(error, 400)
 
     def fetch_quote():
         return jsonify(fetch_quote_data(ticker))
 
     return run_robinhood_request(fetch_quote)
+
 
 @app.route('/api/dividends', methods=['GET'])
 def get_dividends():
@@ -123,17 +177,19 @@ def get_dividends():
 
     return run_robinhood_request(fetch_dividends)
 
+
 @app.route('/api/dividends/yearly/<year>', methods=['GET'])
 def get_yearly_dividends(year):
     try:
         validate_year(year)
-    except InvalidInputError as e:
-        return api_error(e, 400)
+    except InvalidInputError as error:
+        return api_error(error, 400)
 
     def fetch_yearly_dividends():
         return jsonify(fetch_yearly_dividend_summary(year))
 
     return run_robinhood_request(fetch_yearly_dividends)
+
 
 @app.route('/api/dividends/projection', methods=['GET'])
 def get_dividend_projection():
@@ -142,12 +198,14 @@ def get_dividend_projection():
 
     return run_robinhood_request(fetch_projection)
 
+
 @app.route('/api/portfolio', methods=['GET'])
 def get_portfolio():
     def fetch_portfolio():
         return jsonify(fetch_portfolio_data())
 
     return run_robinhood_request(fetch_portfolio)
+
 
 if __name__ == '__main__':
     app.run(port=5000)
