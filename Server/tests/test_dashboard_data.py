@@ -382,6 +382,64 @@ class DashboardDataTests(unittest.TestCase):
         self.assertEqual(estimate['total'], 0)
         self.assertEqual(estimate['unmodeled_tickers'], ['NEW'])
 
+    def test_portfolio_overview_calculates_gain_loss_and_yield(self):
+        overview = dashboard_data.build_portfolio_overview(
+            {'equity': '1000.00'},
+            {
+                'AAPL': {
+                    'name': 'Apple',
+                    'quantity': '3',
+                    'equity': '600.00',
+                    'price': '200.00',
+                    'average_buy_price': '150.00',
+                },
+                'TSLA': {
+                    'name': 'Tesla',
+                    'quantity': '2',
+                    'equity': '400.00',
+                    'price': '200.00',
+                    'average_buy_price': '250.00',
+                },
+            },
+            {'current_holdings_estimate': {'total': 50}},
+        )
+
+        self.assertEqual(overview['total_equity'], 1000)
+        self.assertEqual(overview['position_count'], 2)
+        self.assertEqual(overview['total_cost_basis'], 950)
+        self.assertEqual(overview['unrealized_gain_loss'], 50)
+        self.assertEqual(overview['unrealized_return_percent'], 5.26)
+        self.assertEqual(overview['estimated_dividend_yield_percent'], 5)
+        self.assertEqual(overview['largest_position']['ticker'], 'AAPL')
+        self.assertEqual(overview['largest_position_weight_percent'], 60)
+        self.assertEqual(overview['top_gainers'][0]['ticker'], 'AAPL')
+        self.assertEqual(overview['top_losers'][0]['ticker'], 'TSLA')
+        self.assertEqual(overview['cost_basis_coverage']['covered_position_count'], 2)
+        self.assertEqual(overview['cost_basis_coverage']['coverage_percent'], 100)
+
+    def test_portfolio_overview_handles_missing_cost_basis(self):
+        overview = dashboard_data.build_portfolio_overview(
+            {'equity': '300.00'},
+            {
+                'SCHD': {
+                    'name': 'Schwab US Dividend Equity ETF',
+                    'quantity': '5',
+                    'equity': '300.00',
+                    'price': '60.00',
+                },
+            },
+            {'current_holdings_estimate': {'total': 12}},
+        )
+
+        self.assertIsNone(overview['total_cost_basis'])
+        self.assertIsNone(overview['unrealized_gain_loss'])
+        self.assertIsNone(overview['unrealized_return_percent'])
+        self.assertEqual(overview['estimated_dividend_yield_percent'], 4)
+        self.assertEqual(overview['top_gainers'], [])
+        self.assertEqual(overview['top_losers'], [])
+        self.assertEqual(overview['cost_basis_coverage']['covered_position_count'], 0)
+        self.assertEqual(overview['cost_basis_coverage']['unavailable_position_count'], 1)
+
     @patch('dashboard_data.get_income_calendar')
     @patch('dashboard_data.get_dividend_projection')
     @patch('dashboard_data.get_yearly_dividend_summary')
@@ -405,6 +463,8 @@ class DashboardDataTests(unittest.TestCase):
 
         self.assertEqual(snapshot['portfolio'], {'equity': '123.45'})
         self.assertEqual(snapshot['holdings'], {'AAPL': {'equity': '100.00'}})
+        self.assertEqual(snapshot['portfolio_overview']['position_count'], 1)
+        self.assertEqual(snapshot['portfolio_overview']['total_equity'], 123.45)
         self.assertEqual(snapshot['yearly_dividends']['total'], 0)
         self.assertEqual(snapshot['income_projection'], {'current_year': 2026})
         self.assertEqual(snapshot['income_calendar'], {'year': 2026, 'items': []})

@@ -3,6 +3,7 @@ import { Button, Card, Col, Container, Form, Row } from "react-bootstrap";
 import HoldingsPieChart, { HoldingsTable } from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
 import PortfolioSummary from "./Components/PortfolioSummary";
+import PortfolioOverview from "./Components/PortfolioOverview";
 import IncomeProjection from "./Components/IncomeProjection";
 import IncomeCalendar from "./Components/IncomeCalendar";
 import LoginPage from "./Components/LoginPage";
@@ -12,6 +13,7 @@ import "./App.css";
 
 const createDashboardLoadingState = () => ({
   portfolio: true,
+  portfolioOverview: true,
   holdings: true,
   dividends: true,
   incomeProjection: true,
@@ -21,6 +23,7 @@ const createDashboardLoadingState = () => ({
 
 const createDashboardIdleState = () => ({
   portfolio: false,
+  portfolioOverview: false,
   holdings: false,
   dividends: false,
   incomeProjection: false,
@@ -34,9 +37,11 @@ function App() {
   const [authStatus, setAuthStatus] = useState("checking");
   const [authError, setAuthError] = useState(null);
   const [chartType, setChartType] = useState("Bar Plot");
+  const [activeTab, setActiveTab] = useState("portfolio");
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [comparePreviousYear, setComparePreviousYear] = useState(false);
   const [portfolioData, setPortfolioData] = useState(null);
+  const [portfolioOverviewData, setPortfolioOverviewData] = useState(null);
   const [holdingsData, setHoldingsData] = useState(null);
   const [yearlyDividendData, setYearlyDividendData] = useState(null);
   const [loadedDividendYear, setLoadedDividendYear] = useState(null);
@@ -50,6 +55,7 @@ function App() {
 
   const clearDashboardState = useCallback(() => {
     setPortfolioData(null);
+    setPortfolioOverviewData(null);
     setHoldingsData(null);
     setYearlyDividendData(null);
     setLoadedDividendYear(null);
@@ -129,6 +135,7 @@ function App() {
         }
 
         setPortfolioData(data.portfolio);
+        setPortfolioOverviewData(data.portfolio_overview);
         setHoldingsData(data.holdings);
         setYearlyDividendData(data.yearly_dividends);
         setLoadedDividendYear(data.selected_year);
@@ -151,6 +158,7 @@ function App() {
           status: error.status,
         });
         setPortfolioData(null);
+        setPortfolioOverviewData(null);
         setHoldingsData(null);
         setYearlyDividendData(null);
         setLoadedDividendYear(null);
@@ -158,6 +166,7 @@ function App() {
         setIncomeCalendarData(null);
         setErrors({
           portfolio: error.message,
+          portfolioOverview: error.message,
           holdings: error.message,
           dividends: error.message,
           incomeProjection: error.message,
@@ -347,7 +356,7 @@ function App() {
   };
 
   const renderLoadingState = (section) => {
-    if (section === "portfolio") {
+    if (section === "portfolio" || section === "portfolioOverview") {
       return (
         <div className="summary-placeholder-grid">
           <div className="summary-placeholder-card">
@@ -355,13 +364,23 @@ function App() {
             <span className="placeholder-line" />
           </div>
           <div className="summary-placeholder-card">
-            <span className="placeholder-label">Dividends This Month</span>
+            <span className="placeholder-label">
+              {section === "portfolioOverview" ? "Unrealized Gain/Loss" : "Dividends This Month"}
+            </span>
             <span className="placeholder-line" />
           </div>
           <div className="summary-placeholder-card">
-            <span className="placeholder-label">Dividends This Year</span>
+            <span className="placeholder-label">
+              {section === "portfolioOverview" ? "Estimated Dividend Yield" : "Dividends This Year"}
+            </span>
             <span className="placeholder-line" />
           </div>
+          {section === "portfolioOverview" && (
+            <div className="summary-placeholder-card">
+              <span className="placeholder-label">Largest Position</span>
+              <span className="placeholder-line" />
+            </div>
+          )}
         </div>
       );
     }
@@ -407,8 +426,10 @@ function App() {
         <Col md={10}>
           <div className="dashboard-header-content">
             <div className="dashboard-title-block">
-              <h1 className="dashboard-title">Dividend Dashboard</h1>
-              <p className="dashboard-subtitle">Track your investments and dividend income</p>
+              <h1 className="dashboard-title">Portfolio Dashboard</h1>
+              <p className="dashboard-subtitle">
+                Track allocation, performance, and dividend income
+              </p>
             </div>
             <Button
               className="logout-button"
@@ -419,6 +440,35 @@ function App() {
             >
               Logout
             </Button>
+          </div>
+        </Col>
+      </Row>
+
+      <Row className="dashboard-tabs-row">
+        <Col md={12}>
+          <div className="dashboard-tabs" role="tablist" aria-label="Dashboard views">
+            <button
+              aria-controls="portfolio-panel"
+              aria-selected={activeTab === "portfolio"}
+              className={`dashboard-tab ${activeTab === "portfolio" ? "active" : ""}`}
+              id="portfolio-tab"
+              onClick={() => setActiveTab("portfolio")}
+              role="tab"
+              type="button"
+            >
+              Portfolio
+            </button>
+            <button
+              aria-controls="dividends-panel"
+              aria-selected={activeTab === "dividends"}
+              className={`dashboard-tab ${activeTab === "dividends" ? "active" : ""}`}
+              id="dividends-tab"
+              onClick={() => setActiveTab("dividends")}
+              role="tab"
+              type="button"
+            >
+              Dividends
+            </button>
           </div>
         </Col>
       </Row>
@@ -443,133 +493,158 @@ function App() {
         </Row>
       )}
 
-      <Row className="dashboard-main-row">
-        <Col lg={5} className="mb-4">
-          <Card className="h-100 chart-card">
-            <Card.Body>
-              <Card.Title className="chart-title">Portfolio Allocation</Card.Title>
-              {renderPanelState(
-                "holdings",
-                holdingsData && <HoldingsPieChart data={holdingsData} />
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
+      <section
+        aria-labelledby="portfolio-tab"
+        className="dashboard-tab-panel"
+        hidden={activeTab !== "portfolio"}
+        id="portfolio-panel"
+        role="tabpanel"
+      >
+        <Row className="dashboard-overview-row">
+          <Col md={12}>
+            {renderPanelState(
+              "portfolioOverview",
+              portfolioOverviewData && <PortfolioOverview data={portfolioOverviewData} />
+            )}
+          </Col>
+        </Row>
 
-        <Col lg={7} className="mb-4">
-          <Card className="h-100 chart-card">
-            <Card.Body>
-              <div className="chart-card-header">
-                <Card.Title className="chart-title mb-0">Dividend Performance</Card.Title>
-                <div className="dividend-controls">
-                  <Form.Select
-                    aria-label="Dividend year"
-                    className="year-select"
-                    size="sm"
-                    value={selectedYear}
-                    onChange={handleYearChange}
-                  >
-                    {yearOptions.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  <Form.Select
-                    aria-label="Dividend chart type"
-                    className="chart-type-select"
-                    size="sm"
-                    value={chartType}
-                    onChange={(event) => setChartType(event.target.value)}
-                  >
-                    <option value="Bar Plot">Bar Plot</option>
-                    <option value="Scatter Plot">Scatter Plot</option>
-                    <option value="Line Graph">Line Graph</option>
-                  </Form.Select>
-                  <Form.Check
-                    type="switch"
-                    id="compare-year-switch"
-                    label={`Compare ${selectedYear - 1}`}
-                    checked={comparePreviousYear}
-                    onChange={() => setComparePreviousYear((currentValue) => !currentValue)}
-                  />
+        <Row className="dashboard-main-row">
+          <Col lg={5} className="mb-4">
+            <Card className="h-100 chart-card">
+              <Card.Body>
+                <Card.Title className="chart-title">Portfolio Allocation</Card.Title>
+                {renderPanelState(
+                  "holdings",
+                  holdingsData && <HoldingsPieChart data={holdingsData} />
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+
+          <Col lg={7} className="mb-4">
+            <Card className="h-100 chart-card holdings-table-card">
+              <Card.Body>
+                <Card.Title className="chart-title">Holdings Details</Card.Title>
+                {renderPanelState(
+                  "holdings",
+                  holdingsData && <HoldingsTable data={holdingsData} showPerformance />
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </section>
+
+      <section
+        aria-labelledby="dividends-tab"
+        className="dashboard-tab-panel"
+        hidden={activeTab !== "dividends"}
+        id="dividends-panel"
+        role="tabpanel"
+      >
+        <Row className="dashboard-summary-row">
+          <Col md={12}>
+            {renderPanelState(
+              "portfolio",
+              portfolioData && (
+                <PortfolioSummary
+                  equity={portfolioData.equity}
+                  dividendsThisMonth={portfolioData.dividends_this_month}
+                  dividendsThisYear={portfolioData.dividends_this_year}
+                />
+              )
+            )}
+          </Col>
+        </Row>
+
+        <Row className="dashboard-main-row">
+          <Col md={12} className="mb-4">
+            <Card className="chart-card">
+              <Card.Body>
+                <div className="chart-card-header">
+                  <Card.Title className="chart-title mb-0">Dividend Performance</Card.Title>
+                  <div className="dividend-controls">
+                    <Form.Select
+                      aria-label="Dividend year"
+                      className="year-select"
+                      size="sm"
+                      value={selectedYear}
+                      onChange={handleYearChange}
+                    >
+                      {yearOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </Form.Select>
+                    <Form.Select
+                      aria-label="Dividend chart type"
+                      className="chart-type-select"
+                      size="sm"
+                      value={chartType}
+                      onChange={(event) => setChartType(event.target.value)}
+                    >
+                      <option value="Bar Plot">Bar Plot</option>
+                      <option value="Scatter Plot">Scatter Plot</option>
+                      <option value="Line Graph">Line Graph</option>
+                    </Form.Select>
+                    <Form.Check
+                      type="switch"
+                      id="compare-year-switch"
+                      label={`Compare ${selectedYear - 1}`}
+                      checked={comparePreviousYear}
+                      onChange={() => setComparePreviousYear((currentValue) => !currentValue)}
+                    />
+                  </div>
                 </div>
-              </div>
-              {errors.dividendComparison && !loading.dividendComparison && (
-                <div className="comparison-error">{errors.dividendComparison}</div>
-              )}
-              {renderPanelState(
-                "dividends",
-                yearlyDividendData && (
-                  <DividendChart
-                    data={yearlyDividendData}
-                    comparisonData={previousYearDividendData}
-                    chartType={chartType}
-                    selectedYear={selectedYear}
-                    comparePreviousYear={comparePreviousYear}
-                    isComparisonLoading={loading.dividendComparison}
-                  />
-                )
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+                {errors.dividendComparison && !loading.dividendComparison && (
+                  <div className="comparison-error">{errors.dividendComparison}</div>
+                )}
+                {renderPanelState(
+                  "dividends",
+                  yearlyDividendData && (
+                    <DividendChart
+                      data={yearlyDividendData}
+                      comparisonData={previousYearDividendData}
+                      chartType={chartType}
+                      selectedYear={selectedYear}
+                      comparePreviousYear={comparePreviousYear}
+                      isComparisonLoading={loading.dividendComparison}
+                    />
+                  )
+                )}
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
 
-      <Row className="dashboard-holdings-row">
-        <Col md={12}>
-          <Card className="chart-card holdings-table-card">
-            <Card.Body>
-              <Card.Title className="chart-title">Holdings Details</Card.Title>
-              {renderPanelState(
-                "holdings",
-                holdingsData && <HoldingsTable data={holdingsData} />
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+        <Row className="dashboard-calendar-row">
+          <Col md={12}>
+            {renderPanelState(
+              "incomeCalendar",
+              incomeCalendarData && (
+                <IncomeCalendar
+                  data={incomeCalendarData}
+                />
+              )
+            )}
+          </Col>
+        </Row>
 
-      <Row className="dashboard-calendar-row">
-        <Col md={12}>
-          {renderPanelState(
-            "incomeCalendar",
-            incomeCalendarData && (
-              <IncomeCalendar
-                data={incomeCalendarData}
-              />
-            )
-          )}
-        </Col>
-      </Row>
-
-      <Row className="dashboard-projection-row">
-        <Col md={12}>
-          {renderPanelState(
-            "incomeProjection",
-            incomeProjectionData && (
-              <IncomeProjection
-                data={incomeProjectionData}
-              />
-            )
-          )}
-        </Col>
-      </Row>
-
-      <Row className="dashboard-summary-row">
-        <Col md={12}>
-          {renderPanelState(
-            "portfolio",
-            portfolioData && (
-              <PortfolioSummary
-                equity={portfolioData.equity}
-                dividendsThisMonth={portfolioData.dividends_this_month}
-                dividendsThisYear={portfolioData.dividends_this_year}
-              />
-            )
-          )}
-        </Col>
-      </Row>
+        <Row className="dashboard-projection-row">
+          <Col md={12}>
+            {renderPanelState(
+              "incomeProjection",
+              incomeProjectionData && (
+                <IncomeProjection
+                  data={incomeProjectionData}
+                />
+              )
+            )}
+          </Col>
+        </Row>
+      </section>
     </Container>
   );
 }

@@ -240,16 +240,181 @@ def get_dashboard_snapshot(year=None):
         year = datetime.datetime.now().year
 
     year_text = validate_year(year)
+    portfolio = get_portfolio()
+    holdings = get_holdings()
+    yearly_dividends = get_yearly_dividend_summary(year_text)
     income_projection = get_dividend_projection(year_text)
+    income_calendar = get_income_calendar(year_text, income_projection)
 
     return {
-        "portfolio": get_portfolio(),
-        "holdings": get_holdings(),
-        "yearly_dividends": get_yearly_dividend_summary(year_text),
+        "portfolio": portfolio,
+        "portfolio_overview": build_portfolio_overview(
+            portfolio,
+            holdings,
+            income_projection,
+        ),
+        "holdings": holdings,
+        "yearly_dividends": yearly_dividends,
         "income_projection": income_projection,
-        "income_calendar": get_income_calendar(year_text, income_projection),
+        "income_calendar": income_calendar,
         "selected_year": int(year_text),
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
+
+def round_currency(value):
+    return round(parse_float(value), 2)
+
+
+def round_percent(value):
+    if value is None:
+        return None
+
+    return round(parse_float(value), 2)
+
+
+def build_portfolio_overview(portfolio, holdings, income_projection):
+    holdings = holdings or {}
+    portfolio = portfolio or {}
+    income_projection = income_projection or {}
+    positions = []
+    total_holdings_equity = 0
+    total_cost_basis = 0
+    covered_equity = 0
+    cost_basis_position_count = 0
+
+    for ticker, details in holdings.items():
+        details = details or {}
+        quantity = parse_float(details.get("quantity"))
+        current_price = parse_float(
+            details.get("price") or details.get("current_price")
+        )
+        equity = parse_float(details.get("equity"))
+        average_buy_price = parse_float(details.get("average_buy_price"))
+
+        if equity == 0 and quantity > 0 and current_price > 0:
+            equity = quantity * current_price
+
+        cost_basis = None
+        unrealized_gain_loss = None
+        unrealized_return_percent = None
+
+        if average_buy_price > 0 and quantity > 0:
+            cost_basis = average_buy_price * quantity
+            unrealized_gain_loss = equity - cost_basis
+            unrealized_return_percent = (
+                (unrealized_gain_loss / cost_basis) * 100
+                if cost_basis > 0
+                else None
+            )
+            total_cost_basis += cost_basis
+            covered_equity += equity
+            cost_basis_position_count += 1
+
+        total_holdings_equity += equity
+        positions.append({
+            "ticker": str(ticker).upper(),
+            "name": details.get("name") or str(ticker).upper(),
+            "quantity": round(parse_float(quantity), 4),
+            "equity": round_currency(equity),
+            "current_price": round_currency(current_price),
+            "average_buy_price": (
+                round_currency(average_buy_price)
+                if average_buy_price > 0
+                else None
+            ),
+            "cost_basis": (
+                round_currency(cost_basis)
+                if cost_basis is not None
+                else None
+            ),
+            "unrealized_gain_loss": (
+                round_currency(unrealized_gain_loss)
+                if unrealized_gain_loss is not None
+                else None
+            ),
+            "unrealized_return_percent": round_percent(unrealized_return_percent),
+        })
+
+    portfolio_equity = parse_float(portfolio.get("equity"))
+    total_equity = portfolio_equity if portfolio_equity > 0 else total_holdings_equity
+
+    for position in positions:
+        position["weight_percent"] = (
+            round_percent((position["equity"] / total_equity) * 100)
+            if total_equity > 0
+            else 0
+        )
+
+    positions.sort(key=lambda position: position["equity"], reverse=True)
+    performance_positions = [
+        position
+        for position in positions
+        if position["unrealized_return_percent"] is not None
+    ]
+    estimated_annual_income = parse_float(
+        income_projection
+        .get("current_holdings_estimate", {})
+        .get("total")
+    )
+    unrealized_gain_loss = (
+        total_equity - total_cost_basis
+        if total_cost_basis > 0
+        else None
+    )
+    unrealized_return_percent = (
+        (unrealized_gain_loss / total_cost_basis) * 100
+        if total_cost_basis > 0
+        else None
+    )
+    dividend_yield_percent = (
+        (estimated_annual_income / total_equity) * 100
+        if total_equity > 0
+        else None
+    )
+
+    return {
+        "total_equity": round_currency(total_equity),
+        "position_count": len(positions),
+        "total_cost_basis": (
+            round_currency(total_cost_basis)
+            if total_cost_basis > 0
+            else None
+        ),
+        "unrealized_gain_loss": (
+            round_currency(unrealized_gain_loss)
+            if unrealized_gain_loss is not None
+            else None
+        ),
+        "unrealized_return_percent": round_percent(unrealized_return_percent),
+        "estimated_annual_dividend_income": round_currency(estimated_annual_income),
+        "estimated_dividend_yield_percent": round_percent(dividend_yield_percent),
+        "largest_position": positions[0] if positions else None,
+        "largest_position_weight_percent": (
+            positions[0]["weight_percent"]
+            if positions
+            else 0
+        ),
+        "top_holdings": positions[:5],
+        "top_gainers": sorted(
+            performance_positions,
+            key=lambda position: position["unrealized_return_percent"],
+            reverse=True,
+        )[:5],
+        "top_losers": sorted(
+            performance_positions,
+            key=lambda position: position["unrealized_return_percent"],
+        )[:5],
+        "cost_basis_coverage": {
+            "covered_position_count": cost_basis_position_count,
+            "unavailable_position_count": len(positions) - cost_basis_position_count,
+            "covered_equity": round_currency(covered_equity),
+            "coverage_percent": (
+                round_percent((covered_equity / total_holdings_equity) * 100)
+                if total_holdings_equity > 0
+                else 0
+            ),
+        },
     }
 
 

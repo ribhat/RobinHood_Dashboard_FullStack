@@ -7,6 +7,22 @@ import {
   Tooltip,
 } from "recharts";
 
+const formatCurrency = (value) => (
+  value === null || value === undefined ? "N/A" : `$${Number(value).toFixed(2)}`
+);
+
+const formatPercent = (value) => (
+  value === null || value === undefined ? "N/A" : `${Number(value).toFixed(2)}%`
+);
+
+const getPerformanceClass = (value) => {
+  if (value === null || value === undefined || Number(value) === 0) {
+    return "";
+  }
+
+  return Number(value) > 0 ? "positive-metric" : "negative-metric";
+};
+
 const HoldingsPieChart = ({ data }) => {
   // Convert data to array and sort by equity in descending order
   let chartData = Object.entries(data)
@@ -108,7 +124,7 @@ const HoldingsPieChart = ({ data }) => {
   );
 };
 
-export const HoldingsTable = ({ data }) => {
+export const HoldingsTable = ({ data, showPerformance = false }) => {
   const [sortConfig, setSortConfig] = useState({
     key: "equity",
     direction: "desc",
@@ -121,21 +137,46 @@ export const HoldingsTable = ({ data }) => {
     const rows = Object.entries(data).map(([ticker, details]) => {
       const equity = Number(details.equity || 0);
 
-      return {
+      const row = {
         ticker,
         name: details.name || ticker,
         quantity: Number(details.quantity || 0),
         equity,
         price: Number(details.price || details.current_price || 0),
         averageBuyPrice: Number(details.average_buy_price || 0),
+        costBasis: null,
+        unrealizedGainLoss: null,
+        unrealizedReturnPercent: null,
         weight: totalEquity > 0 ? (equity / totalEquity) * 100 : 0,
       };
+
+      if (row.averageBuyPrice > 0 && row.quantity > 0) {
+        row.costBasis = row.averageBuyPrice * row.quantity;
+        row.unrealizedGainLoss = row.equity - row.costBasis;
+        row.unrealizedReturnPercent = (
+          row.unrealizedGainLoss / row.costBasis
+        ) * 100;
+      }
+
+      return row;
     });
 
     return rows.sort((a, b) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
       const direction = sortConfig.direction === "asc" ? 1 : -1;
+
+      if (aValue === null && bValue === null) {
+        return 0;
+      }
+
+      if (aValue === null) {
+        return 1;
+      }
+
+      if (bValue === null) {
+        return -1;
+      }
 
       if (typeof aValue === "string") {
         return aValue.localeCompare(bValue) * direction;
@@ -195,6 +236,20 @@ export const HoldingsTable = ({ data }) => {
                   {renderSortLabel("Avg Cost", "averageBuyPrice")}
                 </button>
               </th>
+              {showPerformance && (
+                <>
+                  <th>
+                    <button type="button" onClick={() => requestSort("unrealizedGainLoss")}>
+                      {renderSortLabel("Gain/Loss", "unrealizedGainLoss")}
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" onClick={() => requestSort("unrealizedReturnPercent")}>
+                      {renderSortLabel("Return", "unrealizedReturnPercent")}
+                    </button>
+                  </th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -209,6 +264,16 @@ export const HoldingsTable = ({ data }) => {
                 <td>{holding.weight.toFixed(1)}%</td>
                 <td>${holding.price.toFixed(2)}</td>
                 <td>${holding.averageBuyPrice.toFixed(2)}</td>
+                {showPerformance && (
+                  <>
+                    <td className={getPerformanceClass(holding.unrealizedGainLoss)}>
+                      {formatCurrency(holding.unrealizedGainLoss)}
+                    </td>
+                    <td className={getPerformanceClass(holding.unrealizedReturnPercent)}>
+                      {formatPercent(holding.unrealizedReturnPercent)}
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
