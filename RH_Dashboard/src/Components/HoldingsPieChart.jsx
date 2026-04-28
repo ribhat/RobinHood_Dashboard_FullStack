@@ -114,6 +114,7 @@ const HoldingsPieChart = ({ data }) => {
               outerRadius="78%"
               fill="#8884d8"
               dataKey="value"
+              nameKey="name"
             >
               {chartData.map((entry, index) => (
                 <Cell
@@ -123,9 +124,9 @@ const HoldingsPieChart = ({ data }) => {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value) => {
+              formatter={(value, name) => {
                 const percentage = ((value / totalEquity) * 100).toFixed(1);
-                return [`$${value.toFixed(2)} (${percentage}%)`, "Value"];
+                return [`$${value.toFixed(2)} (${percentage}%)`, name];
               }}
             />
           </PieChart>

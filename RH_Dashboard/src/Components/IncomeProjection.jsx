@@ -130,8 +130,8 @@ const IncomeProjection = ({ data }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {projectionDetails.map((position) => (
-                    <tr key={position.ticker}>
+                  {projectionDetails.map((position, positionIndex) => (
+                    <tr key={`${position.ticker}-${position.opened_at}-${positionIndex}`}>
                       <td>
                         <strong>{position.ticker}</strong>
                         <span>Opened {position.opened_at}</span>
@@ -140,13 +140,13 @@ const IncomeProjection = ({ data }) => {
                       <td>{formatCurrency(position.projected_total)}</td>
                       <td>
                         <div className="payment-chip-list">
-                          {position.projected_payments.map((payment) => (
+                          {position.projected_payments.map((payment, index) => (
                             <span
                               className={`payment-chip ${
                                 payment.source === "actual" ? "payment-chip-actual" : ""
                               }`}
                               title={payment.label}
-                              key={`${position.ticker}-${getPaymentDate(payment)}-${payment.rate}`}
+                              key={`${position.ticker}-${getPaymentDate(payment)}-${payment.rate}-${index}`}
                             >
                               {formatDate(getPaymentDate(payment))} {formatCurrency(payment.amount)}
                             </span>
