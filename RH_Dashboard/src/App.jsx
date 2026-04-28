@@ -1,16 +1,35 @@
-import { useState, useEffect } from "react";
-import { Container, Row, Col, Card, Form } from "react-bootstrap";
+import { useCallback, useEffect, useState } from "react";
+import { Button, Card, Col, Container, Form, Row } from "react-bootstrap";
 import HoldingsPieChart from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
 import PortfolioSummary from "./Components/PortfolioSummary";
 import IncomeProjection from "./Components/IncomeProjection";
-import { fetchJson } from "./api";
+import LoginPage from "./Components/LoginPage";
+import { fetchJson, postJson } from "./api";
 import "bootstrap/dist/css/bootstrap.min.css";
-import "./App.css"; // We'll create this for custom styles
+import "./App.css";
+
+const createDashboardLoadingState = () => ({
+  portfolio: true,
+  holdings: true,
+  dividends: true,
+  incomeProjection: true,
+  dividendComparison: false,
+});
+
+const createDashboardIdleState = () => ({
+  portfolio: false,
+  holdings: false,
+  dividends: false,
+  incomeProjection: false,
+  dividendComparison: false,
+});
 
 function App() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 6 }, (_, index) => currentYear - index);
+  const [authStatus, setAuthStatus] = useState("checking");
+  const [authError, setAuthError] = useState(null);
   const [chartType, setChartType] = useState("Bar Plot");
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [comparePreviousYear, setComparePreviousYear] = useState(false);
@@ -22,18 +41,81 @@ function App() {
   const [incomeProjectionData, setIncomeProjectionData] = useState(null);
   const [dashboardError, setDashboardError] = useState(null);
   const [initialDashboardLoaded, setInitialDashboardLoaded] = useState(false);
-  const [loading, setLoading] = useState({
-    portfolio: true,
-    holdings: true,
-    dividends: true,
-    incomeProjection: true,
-  });
+  const [loading, setLoading] = useState(createDashboardLoadingState);
   const [errors, setErrors] = useState({});
+
+  const clearDashboardState = useCallback(() => {
+    setPortfolioData(null);
+    setHoldingsData(null);
+    setYearlyDividendData(null);
+    setLoadedDividendYear(null);
+    setPreviousYearDividendData(null);
+    setIncomeProjectionData(null);
+    setDashboardError(null);
+    setErrors({});
+  }, []);
+
+  const handleUnauthenticatedError = useCallback((error) => {
+    if (error.status !== 401) {
+      return false;
+    }
+
+    setAuthStatus("unauthenticated");
+    setAuthError(error.message);
+    clearDashboardState();
+    setInitialDashboardLoaded(false);
+    setLoading(createDashboardIdleState());
+    return true;
+  }, [clearDashboardState]);
 
   useEffect(() => {
     let ignoreResponse = false;
 
+    const fetchAuthStatus = async () => {
+      try {
+        const data = await fetchJson("/api/auth/status");
+
+        if (ignoreResponse) {
+          return;
+        }
+
+        if (data.authenticated) {
+          setAuthStatus("authenticated");
+          setAuthError(null);
+          setLoading(createDashboardLoadingState());
+        } else {
+          setAuthStatus("unauthenticated");
+          setAuthError(data.error || null);
+          setLoading(createDashboardIdleState());
+        }
+      } catch (error) {
+        if (!ignoreResponse) {
+          setAuthStatus("unauthenticated");
+          setAuthError(error.message);
+          setLoading(createDashboardIdleState());
+        }
+      }
+    };
+
+    fetchAuthStatus();
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated") {
+      return undefined;
+    }
+
+    let ignoreResponse = false;
+    let authFailed = false;
+
     const fetchDashboardSnapshot = async () => {
+      setLoading(createDashboardLoadingState());
+      setInitialDashboardLoaded(false);
+
       try {
         const data = await fetchJson(`/api/dashboard?year=${currentYear}`);
 
@@ -53,6 +135,11 @@ function App() {
           return;
         }
 
+        authFailed = handleUnauthenticatedError(error);
+        if (authFailed) {
+          return;
+        }
+
         setDashboardError({
           message: error.message,
           status: error.status,
@@ -69,14 +156,8 @@ function App() {
           incomeProjection: error.message,
         });
       } finally {
-        if (!ignoreResponse) {
-          setLoading({
-            portfolio: false,
-            holdings: false,
-            dividends: false,
-            incomeProjection: false,
-            dividendComparison: false,
-          });
+        if (!ignoreResponse && !authFailed) {
+          setLoading(createDashboardIdleState());
           setInitialDashboardLoaded(true);
         }
       }
@@ -87,10 +168,10 @@ function App() {
     return () => {
       ignoreResponse = true;
     };
-  }, [currentYear]);
+  }, [authStatus, currentYear, handleUnauthenticatedError]);
 
   useEffect(() => {
-    if (!initialDashboardLoaded) {
+    if (authStatus !== "authenticated" || !initialDashboardLoaded) {
       return undefined;
     }
 
@@ -99,6 +180,7 @@ function App() {
     }
 
     let ignoreResponse = false;
+    let authFailed = false;
 
     const fetchDividendYear = async () => {
       setLoading((currentLoading) => ({
@@ -120,6 +202,11 @@ function App() {
         }
       } catch (error) {
         if (!ignoreResponse) {
+          authFailed = handleUnauthenticatedError(error);
+          if (authFailed) {
+            return;
+          }
+
           setYearlyDividendData(null);
           setErrors((currentErrors) => ({
             ...currentErrors,
@@ -127,7 +214,7 @@ function App() {
           }));
         }
       } finally {
-        if (!ignoreResponse) {
+        if (!ignoreResponse && !authFailed) {
           setLoading((currentLoading) => ({
             ...currentLoading,
             dividends: false,
@@ -141,10 +228,22 @@ function App() {
     return () => {
       ignoreResponse = true;
     };
-  }, [initialDashboardLoaded, loadedDividendYear, selectedYear, yearlyDividendData]);
+  }, [
+    authStatus,
+    handleUnauthenticatedError,
+    initialDashboardLoaded,
+    loadedDividendYear,
+    selectedYear,
+    yearlyDividendData,
+  ]);
 
   useEffect(() => {
+    if (authStatus !== "authenticated") {
+      return undefined;
+    }
+
     let ignoreResponse = false;
+    let authFailed = false;
 
     const fetchComparisonYear = async () => {
       if (!comparePreviousYear) {
@@ -179,6 +278,11 @@ function App() {
         }
       } catch (error) {
         if (!ignoreResponse) {
+          authFailed = handleUnauthenticatedError(error);
+          if (authFailed) {
+            return;
+          }
+
           setPreviousYearDividendData(null);
           setErrors((currentErrors) => ({
             ...currentErrors,
@@ -186,7 +290,7 @@ function App() {
           }));
         }
       } finally {
-        if (!ignoreResponse) {
+        if (!ignoreResponse && !authFailed) {
           setLoading((currentLoading) => ({
             ...currentLoading,
             dividendComparison: false,
@@ -200,7 +304,35 @@ function App() {
     return () => {
       ignoreResponse = true;
     };
-  }, [comparePreviousYear, selectedYear]);
+  }, [authStatus, comparePreviousYear, handleUnauthenticatedError, selectedYear]);
+
+  const handleLogin = async (credentials) => {
+    const data = await postJson("/api/auth/login", credentials);
+
+    if (!data.authenticated) {
+      throw new Error("Unable to start a Robinhood session.");
+    }
+
+    clearDashboardState();
+    setInitialDashboardLoaded(false);
+    setLoading(createDashboardLoadingState());
+    setAuthError(null);
+    setAuthStatus("authenticated");
+  };
+
+  const handleLogout = async () => {
+    try {
+      await postJson("/api/auth/logout");
+      setAuthError(null);
+    } catch (error) {
+      setAuthError(error.message);
+    } finally {
+      clearDashboardState();
+      setInitialDashboardLoaded(false);
+      setLoading(createDashboardIdleState());
+      setAuthStatus("unauthenticated");
+    }
+  };
 
   const handleYearChange = (event) => {
     setSelectedYear(Number(event.target.value));
@@ -246,12 +378,40 @@ function App() {
     return children;
   };
 
+  if (authStatus === "checking") {
+    return (
+      <Container fluid className="dashboard-container auth-check-container">
+        <div className="auth-checking-state">
+          <div className="loading-ring" aria-hidden="true" />
+          <span>Checking Robinhood session...</span>
+        </div>
+      </Container>
+    );
+  }
+
+  if (authStatus === "unauthenticated") {
+    return <LoginPage error={authError} onLogin={handleLogin} />;
+  }
+
   return (
     <Container fluid className="dashboard-container">
       <Row className="justify-content-center dashboard-header">
-        <Col md={10} className="text-center">
-          <h1 className="dashboard-title">Dividend Dashboard</h1>
-          <p className="dashboard-subtitle">Track your investments and dividend income</p>
+        <Col md={10}>
+          <div className="dashboard-header-content">
+            <div className="dashboard-title-block">
+              <h1 className="dashboard-title">Dividend Dashboard</h1>
+              <p className="dashboard-subtitle">Track your investments and dividend income</p>
+            </div>
+            <Button
+              className="logout-button"
+              onClick={handleLogout}
+              size="sm"
+              type="button"
+              variant="outline-secondary"
+            >
+              Logout
+            </Button>
+          </div>
         </Col>
       </Row>
 
@@ -260,13 +420,13 @@ function App() {
           <Col md={12}>
             <div
               className={`connection-banner ${
-                dashboardError.status === 503 ? "auth-banner" : "error-banner"
+                dashboardError.status === 401 ? "auth-banner" : "error-banner"
               }`}
               role="status"
             >
               <strong>
-                {dashboardError.status === 503
-                  ? "Robinhood connection unavailable"
+                {dashboardError.status === 401
+                  ? "Robinhood login required"
                   : "Dashboard data unavailable"}
               </strong>
               <span>{dashboardError.message}</span>

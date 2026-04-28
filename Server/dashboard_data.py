@@ -6,7 +6,11 @@ from collections import defaultdict
 from urllib.parse import urlparse
 
 import requests
-import robin_stocks.robinhood as robin
+
+try:
+    import robin_stocks.robinhood as robin
+except ModuleNotFoundError:
+    robin = None
 
 from Constants.constants import month_conversion_dict, months
 
@@ -60,6 +64,23 @@ polygon_dividend_cache = TTLCache(POLYGON_DIVIDEND_CACHE_TTL_SECONDS)
 polygon_request_timestamps = []
 
 
+def require_robinhood_client():
+    if robin is None:
+        raise RuntimeError(
+            "Robinhood support is not installed. Install project dependencies and try again."
+        )
+
+    return robin
+
+
+def clear_dashboard_caches():
+    dashboard_cache.clear()
+    quote_cache.clear()
+    symbol_cache.clear()
+    polygon_dividend_cache.clear()
+    polygon_request_timestamps.clear()
+
+
 def validate_year(year):
     year_text = str(year)
     current_year = datetime.datetime.now().year
@@ -86,31 +107,39 @@ def validate_ticker(ticker):
 
 
 def get_holdings():
-    return dashboard_cache.get_or_set("holdings", robin.build_holdings)
+    robin_client = require_robinhood_client()
+    return dashboard_cache.get_or_set("holdings", robin_client.build_holdings)
 
 
 def get_open_positions():
-    return dashboard_cache.get_or_set("open_positions", robin.get_open_stock_positions)
+    robin_client = require_robinhood_client()
+    return dashboard_cache.get_or_set(
+        "open_positions",
+        robin_client.get_open_stock_positions,
+    )
 
 
 def get_quote(ticker):
     ticker_text = validate_ticker(ticker)
 
     def fetch_quote():
-        price = robin.get_latest_price(ticker_text)
+        robin_client = require_robinhood_client()
+        price = robin_client.get_latest_price(ticker_text)
         return {'ticker': ticker_text, 'price': float(price[0])}
 
     return quote_cache.get_or_set(f"quote:{ticker_text}", fetch_quote)
 
 
 def get_dividend_records():
-    return dashboard_cache.get_or_set("dividends", robin.account.get_dividends)
+    robin_client = require_robinhood_client()
+    return dashboard_cache.get_or_set("dividends", robin_client.account.get_dividends)
 
 
 def get_portfolio_profile():
+    robin_client = require_robinhood_client()
     return dashboard_cache.get_or_set(
         "portfolio_profile",
-        robin.profiles.load_portfolio_profile,
+        robin_client.profiles.load_portfolio_profile,
     )
 
 
