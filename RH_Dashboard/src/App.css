@@ -39,6 +39,7 @@
 }
 
 .dashboard-main-row,
+.dashboard-holdings-row,
 .dashboard-projection-row,
 .dashboard-calendar-row,
 .dashboard-summary-row,
@@ -237,7 +238,7 @@
 
 .holdings-chart-shell {
   height: auto;
-  min-height: 520px;
+  min-height: 460px;
 }
 
 .dividend-chart-shell {
@@ -336,6 +337,20 @@
   overflow-x: auto;
 }
 
+.holdings-table-card {
+  margin-bottom: 1.5rem;
+}
+
+.holdings-table-wrap {
+  max-height: 28rem;
+  overflow: auto;
+}
+
+.projection-table-wrap {
+  max-height: 34rem;
+  overflow: auto;
+}
+
 .holdings-table,
 .projection-table {
   border-collapse: collapse;
@@ -368,6 +383,13 @@
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.holdings-table th,
+.projection-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .holdings-table th button {
