@@ -147,6 +147,165 @@ class DashboardDataTests(unittest.TestCase):
         self.assertEqual(payments[1]['source'], 'estimate')
         self.assertEqual(payments[1]['amount'], 4.5)
 
+    def test_income_calendar_combines_received_actuals_and_future_estimates(self):
+        dividends = [
+            {
+                'Ticker': 'JEPI',
+                'payable_date': '2026-01-12',
+                'amount': '4.25',
+                'state': 'paid',
+            },
+            {
+                'Ticker': 'JEPI',
+                'payable_date': '2026-05-12',
+                'amount': '4.40',
+                'state': 'paid',
+            },
+            {
+                'Ticker': 'VOID',
+                'payable_date': '2026-03-01',
+                'amount': '10.00',
+                'state': 'voided',
+            },
+        ]
+        projection = {
+            'current_holdings_estimate': {
+                'details': [
+                    {
+                        'ticker': 'JEPI',
+                        'projected_payments': [
+                            {
+                                'expected_date': '2026-01-10',
+                                'actual_date': '2026-01-12',
+                                'amount': 4.25,
+                                'source': 'actual',
+                            },
+                            {
+                                'expected_date': '2026-05-10',
+                                'amount': '4.50',
+                                'source': 'estimate',
+                            },
+                        ],
+                    },
+                    {
+                        'ticker': 'SCHD',
+                        'projected_payments': [
+                            {
+                                'expected_date': '2026-03-15',
+                                'amount': '1.00',
+                                'source': 'estimate',
+                            },
+                            {
+                                'expected_date': '2026-11-20',
+                                'amount': '3.25',
+                                'source': 'estimate',
+                            },
+                        ],
+                    },
+                ],
+            },
+        }
+
+        calendar = dashboard_data.build_income_calendar(
+            '2026',
+            dividends,
+            projection,
+            dashboard_data.parse_date('2026-04-27'),
+        )
+
+        self.assertEqual(
+            calendar['items'],
+            [
+                {
+                    'ticker': 'JEPI',
+                    'date': '2026-01-12',
+                    'amount': 4.25,
+                    'source': 'actual',
+                    'status': 'received',
+                },
+                {
+                    'ticker': 'JEPI',
+                    'date': '2026-05-10',
+                    'amount': 4.5,
+                    'source': 'estimate',
+                    'status': 'estimated',
+                },
+                {
+                    'ticker': 'SCHD',
+                    'date': '2026-11-20',
+                    'amount': 3.25,
+                    'source': 'estimate',
+                    'status': 'estimated',
+                },
+            ],
+        )
+        self.assertEqual(calendar['summary']['next_expected_payment']['ticker'], 'JEPI')
+        self.assertEqual(calendar['summary']['received_annual_income'], 4.25)
+        self.assertEqual(calendar['summary']['remaining_estimated_annual_income'], 7.75)
+        self.assertEqual(calendar['summary']['total_projected_annual_income'], 12)
+
+    def test_income_calendar_groups_payments_by_month(self):
+        dividends = [
+            {
+                'Ticker': 'O',
+                'payable_date': '2026-04-15',
+                'amount': '3.00',
+                'state': 'paid',
+            },
+        ]
+        projection = {
+            'current_holdings_estimate': {
+                'details': [
+                    {
+                        'ticker': 'O',
+                        'projected_payments': [
+                            {
+                                'expected_date': '2026-04-30',
+                                'amount': '3.20',
+                                'source': 'estimate',
+                            },
+                            {
+                                'expected_date': '2026-05-31',
+                                'amount': '3.20',
+                                'source': 'estimate',
+                            },
+                        ],
+                    },
+                ],
+            },
+        }
+
+        calendar = dashboard_data.build_income_calendar(
+            '2026',
+            dividends,
+            projection,
+            dashboard_data.parse_date('2026-04-20'),
+        )
+        april = calendar['months'][3]
+        may = calendar['months'][4]
+
+        self.assertEqual(april['month_name'], 'April')
+        self.assertEqual(april['received'], 3)
+        self.assertEqual(april['estimated'], 3.2)
+        self.assertEqual(april['total'], 6.2)
+        self.assertEqual(calendar['summary']['current_month_income'], 6.2)
+        self.assertEqual(may['total'], 3.2)
+
+    def test_income_calendar_returns_empty_months_without_data(self):
+        calendar = dashboard_data.build_income_calendar(
+            '2026',
+            [],
+            {'current_holdings_estimate': {'details': []}},
+            dashboard_data.parse_date('2026-04-27'),
+        )
+
+        self.assertEqual(calendar['items'], [])
+        self.assertEqual(len(calendar['months']), 12)
+        self.assertTrue(all(month['total'] == 0 for month in calendar['months']))
+        self.assertIsNone(calendar['summary']['next_expected_payment'])
+        self.assertEqual(calendar['summary']['current_month_income'], 0)
+        self.assertEqual(calendar['summary']['remaining_estimated_annual_income'], 0)
+
     @patch.dict('os.environ', {'POLYGON_API_KEY': 'test-key'})
     @patch('dashboard_data.fetch_polygon_dividend_schedule')
     def test_current_year_position_estimate_uses_external_schedule_for_unmodeled_ticker(
@@ -227,6 +386,7 @@ class DashboardDataTests(unittest.TestCase):
         self.assertEqual(estimate['total'], 0)
         self.assertEqual(estimate['unmodeled_tickers'], ['NEW'])
 
+    @patch('dashboard_data.get_income_calendar')
     @patch('dashboard_data.get_dividend_projection')
     @patch('dashboard_data.get_yearly_dividend_summary')
     @patch('dashboard_data.get_holdings')
@@ -237,11 +397,13 @@ class DashboardDataTests(unittest.TestCase):
         mock_holdings,
         mock_yearly_dividends,
         mock_projection,
+        mock_calendar,
     ):
         mock_portfolio.return_value = {'equity': '123.45'}
         mock_holdings.return_value = {'AAPL': {'equity': '100.00'}}
         mock_yearly_dividends.return_value = {'months': [], 'dividends': [], 'total': 0}
         mock_projection.return_value = {'current_year': 2026}
+        mock_calendar.return_value = {'year': 2026, 'items': []}
 
         snapshot = dashboard_data.get_dashboard_snapshot('2026')
 
@@ -249,8 +411,11 @@ class DashboardDataTests(unittest.TestCase):
         self.assertEqual(snapshot['holdings'], {'AAPL': {'equity': '100.00'}})
         self.assertEqual(snapshot['yearly_dividends']['total'], 0)
         self.assertEqual(snapshot['income_projection'], {'current_year': 2026})
+        self.assertEqual(snapshot['income_calendar'], {'year': 2026, 'items': []})
         self.assertEqual(snapshot['selected_year'], 2026)
         self.assertIn('generated_at', snapshot)
+        mock_projection.assert_called_once_with('2026')
+        mock_calendar.assert_called_once_with('2026', {'current_year': 2026})
 
 
 class ApiValidationTests(unittest.TestCase):
@@ -307,6 +472,7 @@ class ApiValidationTests(unittest.TestCase):
             'holdings': {},
             'yearly_dividends': {'months': [], 'dividends': [], 'total': 0},
             'income_projection': {'current_year': 2026},
+            'income_calendar': {'year': 2026, 'items': []},
             'selected_year': 2026,
             'generated_at': '2026-01-01T00:00:00+00:00',
         }

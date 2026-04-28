@@ -4,6 +4,7 @@ import HoldingsPieChart from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
 import PortfolioSummary from "./Components/PortfolioSummary";
 import IncomeProjection from "./Components/IncomeProjection";
+import IncomeCalendar from "./Components/IncomeCalendar";
 import { fetchJson } from "./api";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css"; // We'll create this for custom styles
@@ -20,6 +21,7 @@ function App() {
   const [loadedDividendYear, setLoadedDividendYear] = useState(null);
   const [previousYearDividendData, setPreviousYearDividendData] = useState(null);
   const [incomeProjectionData, setIncomeProjectionData] = useState(null);
+  const [incomeCalendarData, setIncomeCalendarData] = useState(null);
   const [dashboardError, setDashboardError] = useState(null);
   const [initialDashboardLoaded, setInitialDashboardLoaded] = useState(false);
   const [loading, setLoading] = useState({
@@ -27,6 +29,7 @@ function App() {
     holdings: true,
     dividends: true,
     incomeProjection: true,
+    incomeCalendar: true,
   });
   const [errors, setErrors] = useState({});
 
@@ -46,6 +49,7 @@ function App() {
         setYearlyDividendData(data.yearly_dividends);
         setLoadedDividendYear(data.selected_year);
         setIncomeProjectionData(data.income_projection);
+        setIncomeCalendarData(data.income_calendar);
         setDashboardError(null);
         setErrors({});
       } catch (error) {
@@ -62,11 +66,13 @@ function App() {
         setYearlyDividendData(null);
         setLoadedDividendYear(null);
         setIncomeProjectionData(null);
+        setIncomeCalendarData(null);
         setErrors({
           portfolio: error.message,
           holdings: error.message,
           dividends: error.message,
           incomeProjection: error.message,
+          incomeCalendar: error.message,
         });
       } finally {
         if (!ignoreResponse) {
@@ -75,6 +81,7 @@ function App() {
             holdings: false,
             dividends: false,
             incomeProjection: false,
+            incomeCalendar: false,
             dividendComparison: false,
           });
           setInitialDashboardLoaded(true);
@@ -345,6 +352,19 @@ function App() {
               )}
             </Card.Body>
           </Card>
+        </Col>
+      </Row>
+
+      <Row className="dashboard-calendar-row">
+        <Col md={12}>
+          {renderPanelState(
+            "incomeCalendar",
+            incomeCalendarData && (
+              <IncomeCalendar
+                data={incomeCalendarData}
+              />
+            )
+          )}
         </Col>
       </Row>
 

@@ -23,6 +23,7 @@
 
 .dashboard-main-row,
 .dashboard-projection-row,
+.dashboard-calendar-row,
 .dashboard-summary-row,
 .dashboard-status-row {
   max-width: 1440px;
@@ -428,6 +429,15 @@
   padding: clamp(1rem, 2vw, 1.5rem);
 }
 
+.income-calendar-card {
+  background: #ffffff;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+  margin-bottom: 1.5rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+}
+
 .projection-header {
   align-items: flex-start;
   display: flex;
@@ -436,7 +446,24 @@
   margin-bottom: 1rem;
 }
 
+.income-calendar-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
 .projection-header h2 {
+  color: #18283a;
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.2;
+  margin: 0.25rem 0 0;
+}
+
+.income-calendar-header h2 {
   color: #18283a;
   font-size: 1.35rem;
   font-weight: 650;
@@ -454,6 +481,143 @@
   font-weight: 650;
   padding: 0.35rem 0.65rem;
   white-space: nowrap;
+}
+
+.income-calendar-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.income-summary-tile {
+  background: #f8fafc;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  min-height: 112px;
+  padding: 1rem;
+}
+
+.income-summary-tile strong {
+  color: #18283a;
+  display: block;
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.income-summary-tile span:last-child {
+  color: #667085;
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 600;
+  margin-top: 0.55rem;
+}
+
+.income-month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.income-month {
+  background: #ffffff;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  min-height: 178px;
+  min-width: 0;
+  padding: 0.85rem;
+}
+
+.income-month-header {
+  align-items: baseline;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.income-month-header h3 {
+  color: #24364b;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.income-month-header strong {
+  color: #18283a;
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.income-month-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.income-month-breakdown span {
+  color: #667085;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.income-payment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  padding-right: 0.1rem;
+}
+
+.calendar-payment-chip {
+  align-items: center;
+  border-radius: 999px;
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 650;
+  gap: 0.3rem;
+  grid-template-columns: minmax(2.5rem, 0.8fr) auto auto;
+  line-height: 1;
+  padding: 0.4rem 0.55rem;
+}
+
+.calendar-payment-chip strong,
+.calendar-payment-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-payment-chip-received {
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
+  color: #067647;
+}
+
+.calendar-payment-chip-estimated {
+  background: #eef6ff;
+  border: 1px solid #cce4ff;
+  color: #145ea8;
+}
+
+.income-month-empty {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px dashed #d8dee6;
+  border-radius: 8px;
+  color: #667085;
+  display: flex;
+  font-size: 0.84rem;
+  font-weight: 600;
+  justify-content: center;
+  min-height: 2.25rem;
 }
 
 .projection-section + .projection-section {
@@ -607,6 +771,10 @@
     flex-direction: column;
   }
 
+  .income-calendar-header {
+    flex-direction: column;
+  }
+
   .projection-section-header {
     align-items: flex-start;
     flex-direction: column;
@@ -614,6 +782,11 @@
   }
 
   .projection-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .income-calendar-summary,
+  .income-month-grid {
     grid-template-columns: 1fr;
   }
 
@@ -658,5 +831,11 @@
 
   .payment-chip-list {
     justify-content: flex-start;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1180px) {
+  .income-month-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

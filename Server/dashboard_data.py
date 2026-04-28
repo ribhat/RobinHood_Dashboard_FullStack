@@ -186,19 +186,257 @@ def get_dividend_projection(current_year=None):
     }
 
 
+def get_income_calendar(current_year=None, income_projection=None, as_of_date=None):
+    if current_year is None:
+        current_year = datetime.datetime.now().year
+
+    current_year_text = validate_year(current_year)
+    if as_of_date is None:
+        as_of_date = datetime.date.today()
+
+    dividend_data = get_dividend_records()
+    if income_projection is None:
+        income_projection = get_dividend_projection(current_year_text)
+
+    return build_income_calendar(
+        current_year_text,
+        dividend_data,
+        income_projection,
+        as_of_date,
+    )
+
+
 def get_dashboard_snapshot(year=None):
     if year is None:
         year = datetime.datetime.now().year
 
     year_text = validate_year(year)
+    income_projection = get_dividend_projection(year_text)
 
     return {
         "portfolio": get_portfolio(),
         "holdings": get_holdings(),
         "yearly_dividends": get_yearly_dividend_summary(year_text),
-        "income_projection": get_dividend_projection(),
+        "income_projection": income_projection,
+        "income_calendar": get_income_calendar(year_text, income_projection),
         "selected_year": int(year_text),
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
+
+def build_income_calendar(
+    current_year,
+    dividend_data,
+    income_projection,
+    as_of_date=None,
+):
+    current_year_text = validate_year(current_year)
+    if as_of_date is None:
+        as_of_date = datetime.date.today()
+
+    items = build_received_income_calendar_items(
+        dividend_data,
+        current_year_text,
+        as_of_date,
+    )
+    items.extend(
+        build_estimated_income_calendar_items(
+            income_projection,
+            current_year_text,
+            as_of_date,
+        )
+    )
+    items.sort(key=lambda item: (item["date"], item["ticker"], item["source"]))
+    monthly_buckets = build_monthly_income_buckets(items, current_year_text)
+    summary = build_income_calendar_summary(items, monthly_buckets, as_of_date)
+
+    return {
+        "year": int(current_year_text),
+        "as_of_date": as_of_date.isoformat(),
+        "items": items,
+        "months": monthly_buckets,
+        "summary": summary,
+    }
+
+
+def build_received_income_calendar_items(dividend_data, current_year, as_of_date):
+    current_year_text = validate_year(current_year)
+    items = []
+
+    for dividend in dividend_data:
+        if dividend.get("state") == "voided":
+            continue
+
+        payable_date = parse_date(dividend.get("payable_date"))
+        amount = parse_float(dividend.get("amount"))
+
+        if (
+            not payable_date
+            or str(payable_date.year) != current_year_text
+            or payable_date > as_of_date
+            or amount <= 0
+        ):
+            continue
+
+        symbol = get_dividend_symbol(dividend)
+
+        if not symbol:
+            continue
+
+        items.append({
+            "ticker": symbol,
+            "date": payable_date.isoformat(),
+            "amount": round(amount, 2),
+            "source": "actual",
+            "status": "received",
+        })
+
+    return items
+
+
+def build_estimated_income_calendar_items(
+    income_projection,
+    current_year,
+    as_of_date,
+):
+    current_year_text = validate_year(current_year)
+    estimate = income_projection.get("current_holdings_estimate", {})
+    details = estimate.get("details", [])
+    items = []
+
+    for position in details:
+        symbol = position.get("ticker")
+
+        if not symbol:
+            continue
+
+        ticker = validate_ticker(symbol)
+
+        for payment in position.get("projected_payments", []):
+            if payment.get("source") != "estimate":
+                continue
+
+            expected_date = parse_date(payment.get("expected_date"))
+            amount = parse_float(payment.get("amount"))
+
+            if (
+                not expected_date
+                or str(expected_date.year) != current_year_text
+                or expected_date <= as_of_date
+                or amount <= 0
+            ):
+                continue
+
+            items.append({
+                "ticker": ticker,
+                "date": expected_date.isoformat(),
+                "amount": round(amount, 2),
+                "source": "estimate",
+                "status": "estimated",
+            })
+
+    return items
+
+
+def build_monthly_income_buckets(items, current_year):
+    current_year_text = validate_year(current_year)
+    buckets_by_month = {
+        month_conversion_dict[month]: {
+            "month": month_conversion_dict[month],
+            "month_name": month,
+            "received": 0,
+            "estimated": 0,
+            "total": 0,
+            "items": [],
+        }
+        for month in months
+    }
+
+    for item in items:
+        payment_date = parse_date(item.get("date"))
+
+        if not payment_date or str(payment_date.year) != current_year_text:
+            continue
+
+        month = f"{payment_date.month:02d}"
+        bucket = buckets_by_month[month]
+        amount = parse_float(item.get("amount"))
+
+        if item.get("status") == "received":
+            bucket["received"] += amount
+        else:
+            bucket["estimated"] += amount
+
+        bucket["total"] += amount
+        bucket["items"].append(item)
+
+    return [
+        {
+            **bucket,
+            "received": round(bucket["received"], 2),
+            "estimated": round(bucket["estimated"], 2),
+            "total": round(bucket["total"], 2),
+            "items": sorted(
+                bucket["items"],
+                key=lambda item: (item["date"], item["ticker"], item["source"]),
+            ),
+        }
+        for bucket in buckets_by_month.values()
+    ]
+
+
+def build_income_calendar_summary(items, monthly_buckets, as_of_date):
+    current_month = f"{as_of_date.month:02d}"
+    current_month_bucket = next(
+        (
+            bucket
+            for bucket in monthly_buckets
+            if bucket["month"] == current_month
+        ),
+        None,
+    )
+    estimated_items = [
+        item
+        for item in items
+        if item["status"] == "estimated" and parse_date(item["date"]) > as_of_date
+    ]
+    next_expected_payment = estimated_items[0] if estimated_items else None
+    received_annual_income = sum(
+        item["amount"]
+        for item in items
+        if item["status"] == "received"
+    )
+    remaining_estimated_annual_income = sum(
+        item["amount"]
+        for item in estimated_items
+    )
+
+    return {
+        "next_expected_payment": next_expected_payment,
+        "current_month_income": (
+            current_month_bucket["total"]
+            if current_month_bucket
+            else 0
+        ),
+        "current_month_received": (
+            current_month_bucket["received"]
+            if current_month_bucket
+            else 0
+        ),
+        "current_month_estimated": (
+            current_month_bucket["estimated"]
+            if current_month_bucket
+            else 0
+        ),
+        "received_annual_income": round(received_annual_income, 2),
+        "remaining_estimated_annual_income": round(
+            remaining_estimated_annual_income,
+            2,
+        ),
+        "total_projected_annual_income": round(
+            received_annual_income + remaining_estimated_annual_income,
+            2,
+        ),
     }
 
 
