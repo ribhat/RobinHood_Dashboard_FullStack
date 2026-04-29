@@ -16,7 +16,7 @@ class RobinhoodVerificationRequired(RobinhoodAuthError):
     pass
 
 
-def login_to_robinhood(username, password, mfa_code=None):
+def login_to_robinhood(username, password, mfa_code=None, on_verification_required=None):
     if robin is None:
         raise RobinhoodAuthError(
             "Robinhood support is not installed. Install project dependencies and try again."
@@ -30,7 +30,7 @@ def login_to_robinhood(username, password, mfa_code=None):
         raise RobinhoodAuthError("Robinhood username and password are required.")
 
     try:
-        with block_interactive_prompts():
+        with block_interactive_prompts(on_verification_required):
             login_response = robin.login(
                 username=username_text,
                 password=password_text,
@@ -60,21 +60,38 @@ def logout_from_robinhood():
 
 
 @contextmanager
-def block_interactive_prompts():
+def block_interactive_prompts(on_verification_required=None):
     original_input = builtins.input
+    original_print = builtins.print
     original_getpass = getpass.getpass
 
     def raise_prompt_error(*_args, **_kwargs):
+        notify_verification_required(on_verification_required)
         raise RobinhoodVerificationRequired(verification_required_message())
 
+    def capture_verification_print(*args, **kwargs):
+        message = " ".join(str(arg) for arg in args)
+        if looks_like_verification_required(message):
+            notify_verification_required(on_verification_required)
+        original_print(*args, **kwargs)
+
     builtins.input = raise_prompt_error
+    builtins.print = capture_verification_print
     getpass.getpass = raise_prompt_error
 
     try:
         yield
     finally:
         builtins.input = original_input
+        builtins.print = original_print
         getpass.getpass = original_getpass
+
+
+def notify_verification_required(callback):
+    if callback is None:
+        return
+
+    callback()
 
 
 def validate_login_response(login_response):

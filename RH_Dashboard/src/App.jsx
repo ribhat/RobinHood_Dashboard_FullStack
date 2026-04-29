@@ -36,6 +36,7 @@ function App() {
   const yearOptions = Array.from({ length: 6 }, (_, index) => currentYear - index);
   const [authStatus, setAuthStatus] = useState("checking");
   const [authError, setAuthError] = useState(null);
+  const [authMfaRequired, setAuthMfaRequired] = useState(false);
   const [chartType, setChartType] = useState("Bar Plot");
   const [activeTab, setActiveTab] = useState("portfolio");
   const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -73,6 +74,7 @@ function App() {
 
     setAuthStatus("unauthenticated");
     setAuthError(error.message);
+    setAuthMfaRequired(Boolean(error.mfaRequired));
     clearDashboardState();
     setInitialDashboardLoaded(false);
     setLoading(createDashboardIdleState());
@@ -93,16 +95,19 @@ function App() {
         if (data.authenticated) {
           setAuthStatus("authenticated");
           setAuthError(null);
+          setAuthMfaRequired(false);
           setLoading(createDashboardLoadingState());
         } else {
           setAuthStatus("unauthenticated");
           setAuthError(data.error || null);
+          setAuthMfaRequired(Boolean(data.mfa_required));
           setLoading(createDashboardIdleState());
         }
       } catch (error) {
         if (!ignoreResponse) {
           setAuthStatus("unauthenticated");
           setAuthError(error.message);
+          setAuthMfaRequired(false);
           setLoading(createDashboardIdleState());
         }
       }
@@ -324,9 +329,33 @@ function App() {
   }, [authStatus, comparePreviousYear, handleUnauthenticatedError, selectedYear]);
 
   const handleLogin = async (credentials) => {
-    const data = await postJson("/api/auth/login", credentials);
+    setAuthMfaRequired(false);
+
+    const checkPendingLoginStatus = async () => {
+      try {
+        const status = await fetchJson("/api/auth/status");
+        if (status.mfa_required) {
+          setAuthMfaRequired(true);
+        }
+      } catch {
+        // Keep the login attempt focused on its own result.
+      }
+    };
+
+    const loginStatusInterval = window.setInterval(checkPendingLoginStatus, 1500);
+
+    let data;
+    try {
+      data = await postJson("/api/auth/login", credentials);
+    } catch (error) {
+      setAuthMfaRequired(Boolean(error.mfaRequired));
+      throw error;
+    } finally {
+      window.clearInterval(loginStatusInterval);
+    }
 
     if (!data.authenticated) {
+      setAuthMfaRequired(Boolean(data.mfa_required));
       throw new Error("Unable to start a Robinhood session.");
     }
 
@@ -334,6 +363,7 @@ function App() {
     setInitialDashboardLoaded(false);
     setLoading(createDashboardLoadingState());
     setAuthError(null);
+    setAuthMfaRequired(false);
     setAuthStatus("authenticated");
   };
 
@@ -347,6 +377,7 @@ function App() {
       clearDashboardState();
       setInitialDashboardLoaded(false);
       setLoading(createDashboardIdleState());
+      setAuthMfaRequired(false);
       setAuthStatus("unauthenticated");
     }
   };
@@ -417,7 +448,13 @@ function App() {
   }
 
   if (authStatus === "unauthenticated") {
-    return <LoginPage error={authError} onLogin={handleLogin} />;
+    return (
+      <LoginPage
+        error={authError}
+        mfaRequired={authMfaRequired}
+        onLogin={handleLogin}
+      />
+    );
   }
 
   return (

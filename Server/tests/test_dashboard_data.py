@@ -1,7 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 
 SERVER_DIR = Path(__file__).resolve().parents[1]
@@ -478,11 +478,13 @@ class ApiValidationTests(unittest.TestCase):
     def setUp(self):
         main.robinhood_login = None
         main.robinhood_auth_error = None
+        main.robinhood_auth_requires_mfa = False
         self.client = main.app.test_client()
 
     def tearDown(self):
         main.robinhood_login = None
         main.robinhood_auth_error = None
+        main.robinhood_auth_requires_mfa = False
         dashboard_data.clear_dashboard_caches()
 
     def test_health_check_does_not_require_robinhood_auth(self):
@@ -550,11 +552,13 @@ class ApiAuthTests(unittest.TestCase):
     def setUp(self):
         main.robinhood_login = None
         main.robinhood_auth_error = None
+        main.robinhood_auth_requires_mfa = False
         self.client = main.app.test_client()
 
     def tearDown(self):
         main.robinhood_login = None
         main.robinhood_auth_error = None
+        main.robinhood_auth_requires_mfa = False
         dashboard_data.clear_dashboard_caches()
 
     @patch('main.login_to_robinhood')
@@ -563,6 +567,25 @@ class ApiAuthTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'authenticated': False})
+        mock_login.assert_not_called()
+
+    @patch('main.login_to_robinhood')
+    def test_auth_status_reports_pending_verification(self, mock_login):
+        main.robinhood_auth_error = 'MFA required'
+        main.robinhood_auth_requires_mfa = True
+
+        response = self.client.get('/api/auth/status')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {
+                'authenticated': False,
+                'error': 'MFA required',
+                'mfa_required': True,
+                'code': 'mfa_required',
+            },
+        )
         mock_login.assert_not_called()
 
     @patch('main.clear_dashboard_caches')
@@ -586,7 +609,12 @@ class ApiAuthTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {'authenticated': True})
         self.assertEqual(main.robinhood_login, {'access_token': 'token'})
-        mock_login.assert_called_once_with('user@example.com', 'secret', '123456')
+        mock_login.assert_called_once_with(
+            'user@example.com',
+            'secret',
+            '123456',
+            on_verification_required=ANY,
+        )
         mock_clear_caches.assert_called_once()
 
     @patch('main.login_to_robinhood')
@@ -612,7 +640,15 @@ class ApiAuthTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 409)
-        self.assertEqual(response.get_json()['error'], 'MFA required')
+        self.assertEqual(
+            response.get_json(),
+            {
+                'authenticated': False,
+                'error': 'MFA required',
+                'mfa_required': True,
+                'code': 'mfa_required',
+            },
+        )
         self.assertFalse(main.is_robinhood_authenticated())
 
     @patch('main.clear_dashboard_caches')

@@ -25,6 +25,12 @@ CORS(app)
 
 robinhood_login = None
 robinhood_auth_error = None
+robinhood_auth_requires_mfa = False
+MFA_REQUIRED_CODE = 'mfa_required'
+MFA_REQUIRED_STATUS_MESSAGE = (
+    'Robinhood is waiting for MFA confirmation. Approve the prompt in your '
+    'Robinhood app to continue.'
+)
 
 
 class AuthenticationRequired(Exception):
@@ -43,21 +49,29 @@ def ensure_robinhood_login():
 
 
 def set_robinhood_session(login_response):
-    global robinhood_login, robinhood_auth_error
+    global robinhood_login, robinhood_auth_error, robinhood_auth_requires_mfa
     robinhood_login = login_response
     robinhood_auth_error = None
+    robinhood_auth_requires_mfa = False
 
 
 def clear_robinhood_session():
-    global robinhood_login, robinhood_auth_error
+    global robinhood_login, robinhood_auth_error, robinhood_auth_requires_mfa
     robinhood_login = None
     robinhood_auth_error = None
+    robinhood_auth_requires_mfa = False
     logout_from_robinhood()
     clear_dashboard_caches()
 
 
-def api_error(error, status=500):
-    return jsonify({'error': str(error)}), status
+def mark_robinhood_mfa_required():
+    global robinhood_auth_error, robinhood_auth_requires_mfa
+    robinhood_auth_error = MFA_REQUIRED_STATUS_MESSAGE
+    robinhood_auth_requires_mfa = True
+
+
+def api_error(error, status=500, **extra_fields):
+    return jsonify({'error': str(error), **extra_fields}), status
 
 
 def run_robinhood_request(callback):
@@ -85,6 +99,9 @@ def auth_status():
 
     if not response['authenticated'] and robinhood_auth_error:
         response['error'] = robinhood_auth_error
+        if robinhood_auth_requires_mfa:
+            response['mfa_required'] = True
+            response['code'] = MFA_REQUIRED_CODE
 
     return jsonify(response)
 
@@ -96,23 +113,34 @@ def robinhood_status():
 
 @app.route('/api/auth/login', methods=['POST'])
 def auth_login():
-    global robinhood_auth_error
+    global robinhood_auth_error, robinhood_auth_requires_mfa
     payload = request.get_json(silent=True) or {}
+    robinhood_auth_error = None
+    robinhood_auth_requires_mfa = False
 
     try:
         login_response = login_to_robinhood(
             payload.get('username'),
             payload.get('password'),
             payload.get('mfa_code'),
+            on_verification_required=mark_robinhood_mfa_required,
         )
         set_robinhood_session(login_response)
         clear_dashboard_caches()
         return jsonify({'authenticated': True})
     except RobinhoodVerificationRequired as error:
         robinhood_auth_error = str(error)
-        return api_error(error, 409)
+        robinhood_auth_requires_mfa = True
+        return api_error(
+            error,
+            409,
+            authenticated=False,
+            mfa_required=True,
+            code=MFA_REQUIRED_CODE,
+        )
     except RobinhoodAuthError as error:
         robinhood_auth_error = str(error)
+        robinhood_auth_requires_mfa = False
         return api_error(error, 401)
 
 
