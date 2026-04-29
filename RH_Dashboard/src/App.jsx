@@ -31,16 +31,113 @@ const createDashboardIdleState = () => ({
   dividendComparison: false,
 });
 
+const DASHBOARD_PREFERENCES_KEY = "rh-dashboard:preferences";
+const DASHBOARD_TABS = ["portfolio", "dividends"];
+const CHART_TYPES = ["Bar Plot", "Scatter Plot", "Line Graph"];
+
+const getStoredDashboardPreferences = (currentYear) => {
+  const defaults = {
+    activeTab: "portfolio",
+    selectedYear: currentYear,
+    chartType: "Bar Plot",
+    comparePreviousYear: false,
+  };
+
+  try {
+    const storedPreferences = JSON.parse(
+      window.localStorage.getItem(DASHBOARD_PREFERENCES_KEY) || "{}"
+    );
+    const selectedYear = Number(storedPreferences.selectedYear);
+
+    return {
+      activeTab: DASHBOARD_TABS.includes(storedPreferences.activeTab)
+        ? storedPreferences.activeTab
+        : defaults.activeTab,
+      selectedYear:
+        Number.isInteger(selectedYear) &&
+        selectedYear <= currentYear &&
+        selectedYear >= currentYear - 5
+          ? selectedYear
+          : defaults.selectedYear,
+      chartType: CHART_TYPES.includes(storedPreferences.chartType)
+        ? storedPreferences.chartType
+        : defaults.chartType,
+      comparePreviousYear: Boolean(storedPreferences.comparePreviousYear),
+    };
+  } catch {
+    return defaults;
+  }
+};
+
+const formatGeneratedAt = (generatedAt) => {
+  if (!generatedAt) {
+    return "Not loaded yet";
+  }
+
+  const generatedDate = new Date(generatedAt);
+
+  if (Number.isNaN(generatedDate.getTime())) {
+    return "Recently updated";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(generatedDate);
+};
+
+const getPanelEmptyStateMessage = (section) => {
+  const messages = {
+    portfolio: "Portfolio metrics will appear after the dashboard refresh completes.",
+    portfolioOverview: "Portfolio health metrics are not available yet.",
+    holdings: "No holdings were returned for the current Robinhood session.",
+    dividends: "No dividend payments were found for the selected year.",
+    incomeProjection: "Dividend projections need holdings and dividend history to model income.",
+    incomeCalendar: "No received or estimated dividend payments are available yet.",
+  };
+
+  return messages[section] || "No dashboard data is available yet.";
+};
+
+const getSourceNotes = (dataSources) => {
+  const sources = dataSources || {};
+  const notes = [];
+
+  if (sources.robinhood?.enabled) {
+    notes.push("Robinhood portfolio, holdings, and dividend history");
+  }
+
+  if (sources.polygon?.enabled) {
+    const usedTickers = sources.polygon.used_for_tickers || [];
+    notes.push(
+      usedTickers.length > 0
+        ? `Polygon fallback used for ${usedTickers.join(", ")}`
+        : "Polygon fallback ready"
+    );
+  } else {
+    notes.push("Polygon fallback not configured");
+  }
+
+  return notes;
+};
+
 function App() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 6 }, (_, index) => currentYear - index);
+  const [initialPreferences] = useState(() =>
+    getStoredDashboardPreferences(currentYear)
+  );
   const [authStatus, setAuthStatus] = useState("checking");
   const [authError, setAuthError] = useState(null);
   const [authMfaRequired, setAuthMfaRequired] = useState(false);
-  const [chartType, setChartType] = useState("Bar Plot");
-  const [activeTab, setActiveTab] = useState("portfolio");
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [comparePreviousYear, setComparePreviousYear] = useState(false);
+  const [chartType, setChartType] = useState(initialPreferences.chartType);
+  const [activeTab, setActiveTab] = useState(initialPreferences.activeTab);
+  const [selectedYear, setSelectedYear] = useState(initialPreferences.selectedYear);
+  const [comparePreviousYear, setComparePreviousYear] = useState(
+    initialPreferences.comparePreviousYear
+  );
   const [portfolioData, setPortfolioData] = useState(null);
   const [portfolioOverviewData, setPortfolioOverviewData] = useState(null);
   const [holdingsData, setHoldingsData] = useState(null);
@@ -49,10 +146,42 @@ function App() {
   const [previousYearDividendData, setPreviousYearDividendData] = useState(null);
   const [incomeProjectionData, setIncomeProjectionData] = useState(null);
   const [incomeCalendarData, setIncomeCalendarData] = useState(null);
+  const [dashboardMetadata, setDashboardMetadata] = useState(null);
   const [dashboardError, setDashboardError] = useState(null);
   const [initialDashboardLoaded, setInitialDashboardLoaded] = useState(false);
   const [loading, setLoading] = useState(createDashboardLoadingState);
   const [errors, setErrors] = useState({});
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      DASHBOARD_PREFERENCES_KEY,
+      JSON.stringify({
+        activeTab,
+        selectedYear,
+        chartType,
+        comparePreviousYear,
+      })
+    );
+  }, [activeTab, chartType, comparePreviousYear, selectedYear]);
+
+  const applyDashboardSnapshot = useCallback((data) => {
+    setPortfolioData(data.portfolio);
+    setPortfolioOverviewData(data.portfolio_overview);
+    setHoldingsData(data.holdings);
+    setYearlyDividendData(data.yearly_dividends);
+    setLoadedDividendYear(data.selected_year);
+    setIncomeProjectionData(data.income_projection);
+    setIncomeCalendarData(data.income_calendar);
+    setDashboardMetadata({
+      generatedAt: data.generated_at,
+      warnings: data.warnings || [],
+      dataSources: data.data_sources || {},
+      partialDataAvailable: Boolean(data.partial_data_available),
+    });
+    setDashboardError(null);
+    setErrors({});
+  }, []);
 
   const clearDashboardState = useCallback(() => {
     setPortfolioData(null);
@@ -63,6 +192,7 @@ function App() {
     setPreviousYearDividendData(null);
     setIncomeProjectionData(null);
     setIncomeCalendarData(null);
+    setDashboardMetadata(null);
     setDashboardError(null);
     setErrors({});
   }, []);
@@ -139,15 +269,7 @@ function App() {
           return;
         }
 
-        setPortfolioData(data.portfolio);
-        setPortfolioOverviewData(data.portfolio_overview);
-        setHoldingsData(data.holdings);
-        setYearlyDividendData(data.yearly_dividends);
-        setLoadedDividendYear(data.selected_year);
-        setIncomeProjectionData(data.income_projection);
-        setIncomeCalendarData(data.income_calendar);
-        setDashboardError(null);
-        setErrors({});
+        applyDashboardSnapshot(data);
       } catch (error) {
         if (ignoreResponse) {
           return;
@@ -190,7 +312,13 @@ function App() {
     return () => {
       ignoreResponse = true;
     };
-  }, [authStatus, currentYear, handleUnauthenticatedError]);
+  }, [
+    applyDashboardSnapshot,
+    authStatus,
+    currentYear,
+    handleUnauthenticatedError,
+    refreshKey,
+  ]);
 
   useEffect(() => {
     if (authStatus !== "authenticated" || !initialDashboardLoaded) {
@@ -382,6 +510,12 @@ function App() {
     }
   };
 
+  const handleRefreshDashboard = () => {
+    setLoadedDividendYear(null);
+    setPreviousYearDividendData(null);
+    setRefreshKey((currentKey) => currentKey + 1);
+  };
+
   const handleYearChange = (event) => {
     setSelectedYear(Number(event.target.value));
   };
@@ -433,8 +567,27 @@ function App() {
       return <div className="panel-state error-state">{errors[section]}</div>;
     }
 
+    if (!children) {
+      return (
+        <div className="panel-state empty-state">
+          {getPanelEmptyStateMessage(section)}
+        </div>
+      );
+    }
+
     return children;
   };
+
+  const isDashboardBusy = Object.values(loading).some(Boolean);
+  const dashboardWarnings = dashboardMetadata?.warnings || [];
+  const sourceNotes = dashboardMetadata
+    ? getSourceNotes(dashboardMetadata.dataSources)
+    : ["Waiting for dashboard data"];
+  const dashboardDataStatus = !dashboardMetadata
+    ? "Loading"
+    : dashboardMetadata.partialDataAvailable
+    ? "Partial data"
+    : "Ready";
 
   if (authStatus === "checking") {
     return (
@@ -460,7 +613,7 @@ function App() {
   return (
     <Container fluid className="dashboard-container">
       <Row className="justify-content-center dashboard-header">
-        <Col md={10}>
+        <Col md={12}>
           <div className="dashboard-header-content">
             <div className="dashboard-title-block">
               <h1 className="dashboard-title">Portfolio Dashboard</h1>
@@ -468,15 +621,50 @@ function App() {
                 Track allocation, performance, and dividend income
               </p>
             </div>
-            <Button
-              className="logout-button"
-              onClick={handleLogout}
-              size="sm"
-              type="button"
-              variant="outline-secondary"
-            >
-              Logout
-            </Button>
+            <div className="dashboard-header-actions">
+              <Button
+                className="refresh-button"
+                disabled={isDashboardBusy}
+                onClick={handleRefreshDashboard}
+                size="sm"
+                type="button"
+                variant="primary"
+              >
+                {isDashboardBusy ? "Refreshing" : "Refresh"}
+              </Button>
+              <Button
+                className="logout-button"
+                onClick={handleLogout}
+                size="sm"
+                type="button"
+                variant="outline-secondary"
+              >
+                Logout
+              </Button>
+            </div>
+          </div>
+        </Col>
+      </Row>
+
+      <Row className="dashboard-status-row">
+        <Col md={12}>
+          <div className="dashboard-status-strip" aria-label="Dashboard status">
+            <div className="dashboard-status-item">
+              <span className="metric-kicker">Session</span>
+              <strong>Robinhood connected</strong>
+            </div>
+            <div className="dashboard-status-item">
+              <span className="metric-kicker">Last Updated</span>
+              <strong>{formatGeneratedAt(dashboardMetadata?.generatedAt)}</strong>
+            </div>
+            <div className="dashboard-status-item">
+              <span className="metric-kicker">Data Status</span>
+              <strong>{dashboardDataStatus}</strong>
+            </div>
+            <div className="dashboard-status-item dashboard-source-item">
+              <span className="metric-kicker">Sources</span>
+              <strong>{sourceNotes.join(" / ")}</strong>
+            </div>
           </div>
         </Col>
       </Row>
@@ -525,6 +713,23 @@ function App() {
                   : "Dashboard data unavailable"}
               </strong>
               <span>{dashboardError.message}</span>
+            </div>
+          </Col>
+        </Row>
+      )}
+
+      {dashboardWarnings.length > 0 && (
+        <Row className="dashboard-status-row">
+          <Col md={12}>
+            <div className="connection-banner warning-banner" role="status">
+              <strong>Data notes</strong>
+              <ul className="dashboard-warning-list">
+                {dashboardWarnings.map((warning) => (
+                  <li key={`${warning.code}-${warning.message}`}>
+                    {warning.message}
+                  </li>
+                ))}
+              </ul>
             </div>
           </Col>
         </Row>

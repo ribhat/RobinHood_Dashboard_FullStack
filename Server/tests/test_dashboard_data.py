@@ -10,6 +10,7 @@ if str(SERVER_DIR) not in sys.path:
 
 import dashboard_data
 import main
+import robinhood_auth
 
 
 class DashboardDataTests(unittest.TestCase):
@@ -470,8 +471,55 @@ class DashboardDataTests(unittest.TestCase):
         self.assertEqual(snapshot['income_calendar'], {'year': 2026, 'items': []})
         self.assertEqual(snapshot['selected_year'], 2026)
         self.assertIn('generated_at', snapshot)
+        self.assertIn('warnings', snapshot)
+        self.assertIn('data_sources', snapshot)
+        self.assertIn('partial_data_available', snapshot)
         mock_projection.assert_called_once_with('2026')
         mock_calendar.assert_called_once_with('2026', {'current_year': 2026})
+
+    def test_dashboard_warnings_flag_partial_data(self):
+        warnings = dashboard_data.build_dashboard_warnings(
+            {'NEW': {'equity': '100.00'}},
+            {'total': 0},
+            {
+                'current_holdings_estimate': {
+                    'unmodeled_tickers': ['NEW'],
+                    'external_lookup_used': [],
+                    'rate_limited_tickers': ['RATE'],
+                },
+            },
+            {
+                'cost_basis_coverage': {
+                    'unavailable_position_count': 1,
+                },
+            },
+        )
+
+        self.assertEqual(
+            [warning['code'] for warning in warnings],
+            [
+                'dividends_empty',
+                'missing_cost_basis',
+                'unmodeled_dividend_schedule',
+                'external_lookup_rate_limited',
+            ],
+        )
+        self.assertEqual(warnings[2]['tickers'], ['NEW'])
+        self.assertEqual(warnings[3]['tickers'], ['RATE'])
+
+    @patch.dict('os.environ', {'POLYGON_API_KEY': 'test-key'})
+    def test_dashboard_data_sources_include_external_lookup_status(self):
+        sources = dashboard_data.build_dashboard_data_sources({
+            'current_holdings_estimate': {
+                'external_lookup_used': ['NEW'],
+                'rate_limited_tickers': ['RATE'],
+            },
+        })
+
+        self.assertTrue(sources['robinhood']['enabled'])
+        self.assertTrue(sources['polygon']['enabled'])
+        self.assertEqual(sources['polygon']['used_for_tickers'], ['NEW'])
+        self.assertEqual(sources['polygon']['rate_limited_tickers'], ['RATE'])
 
 
 class ApiValidationTests(unittest.TestCase):
@@ -651,6 +699,58 @@ class ApiAuthTests(unittest.TestCase):
         )
         self.assertFalse(main.is_robinhood_authenticated())
 
+    @patch('main.login_to_robinhood')
+    def test_login_code_required_keeps_pending_login_context(self, mock_login):
+        pending_login = {'workflow_id': 'workflow-id'}
+        mock_login.side_effect = main.RobinhoodVerificationRequired(
+            'MFA code required',
+            pending_login=pending_login,
+            mfa_code_required=True,
+        )
+
+        response = self.client.post(
+            '/api/auth/login',
+            json={'username': 'user@example.com', 'password': 'secret'},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.get_json(),
+            {
+                'authenticated': False,
+                'error': 'MFA code required',
+                'mfa_required': True,
+                'mfa_code_required': True,
+                'code': 'mfa_code_required',
+            },
+        )
+        self.assertEqual(main.pending_robinhood_login, pending_login)
+
+    @patch('main.clear_dashboard_caches')
+    @patch('main.complete_pending_login')
+    def test_login_with_mfa_code_completes_pending_login(
+        self,
+        mock_complete_pending_login,
+        mock_clear_caches,
+    ):
+        main.pending_robinhood_login = {'workflow_id': 'workflow-id'}
+        mock_complete_pending_login.return_value = {'access_token': 'token'}
+
+        response = self.client.post(
+            '/api/auth/login',
+            json={'mfa_code': '123456'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'authenticated': True})
+        self.assertEqual(main.robinhood_login, {'access_token': 'token'})
+        self.assertIsNone(main.pending_robinhood_login)
+        mock_complete_pending_login.assert_called_once_with(
+            {'workflow_id': 'workflow-id'},
+            '123456',
+        )
+        mock_clear_caches.assert_called_once()
+
     @patch('main.clear_dashboard_caches')
     @patch('main.logout_from_robinhood')
     def test_logout_clears_session_and_caches(self, mock_logout, mock_clear_caches):
@@ -671,6 +771,305 @@ class ApiAuthTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertIn('Log in to Robinhood', response.get_json()['error'])
         mock_snapshot.assert_not_called()
+
+
+class RobinhoodAuthFlowTests(unittest.TestCase):
+    def setUp(self):
+        self.request_post_patcher = patch('robinhood_auth.robin_auth.request_post')
+        self.request_get_patcher = patch('robinhood_auth.robin_auth.request_get')
+        self.update_session_patcher = patch('robinhood_auth.robin_auth.update_session')
+        self.set_login_state_patcher = patch('robinhood_auth.robin_auth.set_login_state')
+        self.sleep_patcher = patch('robinhood_auth.time.sleep')
+
+        self.mock_request_post = self.request_post_patcher.start()
+        self.mock_request_get = self.request_get_patcher.start()
+        self.mock_update_session = self.update_session_patcher.start()
+        self.mock_set_login_state = self.set_login_state_patcher.start()
+        self.mock_sleep = self.sleep_patcher.start()
+
+    def tearDown(self):
+        self.request_post_patcher.stop()
+        self.request_get_patcher.stop()
+        self.update_session_patcher.stop()
+        self.set_login_state_patcher.stop()
+        self.sleep_patcher.stop()
+
+    @patch('robinhood_auth.robin_auth.login_url', return_value='https://login.example')
+    @patch('robinhood_auth.robin_auth.generate_device_token', return_value='device-token')
+    def test_login_waits_for_device_approval_and_completes(
+        self,
+        mock_generate_device_token,
+        mock_login_url,
+    ):
+        self.mock_request_post.side_effect = [
+            {
+                'verification_workflow': {
+                    'id': 'workflow-id',
+                    'workflow_status': 'workflow_status_internal_pending',
+                },
+            },
+            {
+                'id': 'inquiry-id',
+                'type_context': {
+                    'result': 'workflow_status_internal_pending',
+                },
+            },
+            {
+                'access_token': 'access-token',
+                'token_type': 'Bearer',
+                'refresh_token': 'refresh-token',
+            },
+        ]
+        self.mock_request_get.return_value = {
+            'type_context': {
+                'result': 'workflow_status_approved',
+            },
+        }
+        on_verification_required = Mock()
+
+        login_response = robinhood_auth.login_to_robinhood(
+            'user@example.com',
+            'secret',
+            on_verification_required=on_verification_required,
+        )
+
+        self.assertEqual(login_response['access_token'], 'access-token')
+        self.assertEqual(self.mock_request_post.call_count, 3)
+        self.mock_request_get.assert_called_once()
+        on_verification_required.assert_called_once()
+        self.mock_sleep.assert_not_called()
+        self.mock_update_session.assert_called_once_with(
+            'Authorization',
+            'Bearer access-token',
+        )
+        self.mock_set_login_state.assert_called_once_with(True)
+        mock_generate_device_token.assert_called_once()
+        mock_login_url.assert_called_once()
+
+    @patch('robinhood_auth.robin_auth.login_url', return_value='https://login.example')
+    @patch('robinhood_auth.robin_auth.generate_device_token', return_value='device-token')
+    def test_login_completes_phone_prompt_after_challenge_validation(
+        self,
+        mock_generate_device_token,
+        mock_login_url,
+    ):
+        self.mock_request_post.side_effect = [
+            {
+                'verification_workflow': {
+                    'id': 'workflow-id',
+                    'workflow_status': 'workflow_status_internal_pending',
+                },
+            },
+            {
+                'id': 'inquiry-id',
+            },
+            {
+                'state_name': 'Challenge',
+                'type': 'result',
+                'type_context': {
+                    'result': 'workflow_status_approved',
+                    'result_type': 'workflow_status',
+                },
+            },
+            {
+                'access_token': 'access-token',
+                'token_type': 'Bearer',
+                'refresh_token': 'refresh-token',
+            },
+        ]
+        self.mock_request_get.side_effect = [
+            {
+                'state_name': 'Challenge',
+                'sequence': 7,
+                'type_context': {
+                    'context': {
+                        'sheriff_challenge': {
+                            'id': 'challenge-id',
+                            'type': 'prompt',
+                            'status': 'issued',
+                        },
+                    },
+                },
+            },
+            {
+                'type': 'prompt',
+                'status': 'issued',
+            },
+            {
+                'type': 'prompt',
+                'status': 'validated',
+            },
+        ]
+
+        login_response = robinhood_auth.login_to_robinhood(
+            'user@example.com',
+            'secret',
+        )
+
+        self.assertEqual(login_response['access_token'], 'access-token')
+        self.assertEqual(self.mock_request_post.call_count, 4)
+        self.assertEqual(self.mock_request_get.call_count, 3)
+        self.mock_request_post.assert_any_call(
+            url='https://api.robinhood.com/pathfinder/inquiries/inquiry-id/user_view/',
+            payload={
+                'sequence': 7,
+                'user_input': {
+                    'status': 'continue',
+                },
+            },
+            json=True,
+        )
+        self.mock_sleep.assert_called_once_with(
+            robinhood_auth.DEVICE_APPROVAL_POLL_INTERVAL_SECONDS,
+        )
+        mock_generate_device_token.assert_called_once()
+        mock_login_url.assert_called_once()
+
+    @patch('robinhood_auth.robin_auth.login_url', return_value='https://login.example')
+    @patch('robinhood_auth.robin_auth.generate_device_token', return_value='device-token')
+    def test_login_polls_device_inquiry_without_reposting_login_until_approved(
+        self,
+        mock_generate_device_token,
+        mock_login_url,
+    ):
+        self.mock_request_post.side_effect = [
+            {
+                'verification_workflow': {
+                    'id': 'workflow-id',
+                    'workflow_status': 'workflow_status_internal_pending',
+                },
+            },
+            {
+                'id': 'inquiry-id',
+            },
+            {
+                'access_token': 'access-token',
+                'token_type': 'Bearer',
+                'refresh_token': 'refresh-token',
+            },
+        ]
+        self.mock_request_get.side_effect = [
+            {
+                'type_context': {},
+                'state_name': 'waiting_for_device_approval',
+            },
+            {
+                'type_context': {
+                    'result': 'workflow_status_approved',
+                },
+            },
+        ]
+
+        login_response = robinhood_auth.login_to_robinhood(
+            'user@example.com',
+            'secret',
+        )
+
+        self.assertEqual(login_response['access_token'], 'access-token')
+        self.assertEqual(self.mock_request_post.call_count, 3)
+        self.assertEqual(self.mock_request_get.call_count, 2)
+        self.mock_sleep.assert_called_once_with(
+            robinhood_auth.DEVICE_APPROVAL_POLL_INTERVAL_SECONDS,
+        )
+        mock_generate_device_token.assert_called_once()
+        mock_login_url.assert_called_once()
+
+    @patch('robinhood_auth.robin_auth.login_url', return_value='https://login.example')
+    @patch('robinhood_auth.robin_auth.generate_device_token', return_value='device-token')
+    def test_login_returns_pending_context_when_workflow_requires_code(
+        self,
+        mock_generate_device_token,
+        mock_login_url,
+    ):
+        self.mock_request_post.side_effect = [
+            {
+                'verification_workflow': {
+                    'id': 'workflow-id',
+                    'workflow_status': 'workflow_status_internal_pending',
+                },
+            },
+            {
+                'id': 'inquiry-id',
+            },
+        ]
+        self.mock_request_get.return_value = {
+            'state_name': 'Challenge',
+            'type_context': {
+                'context': {
+                    'sheriff_challenge': {
+                        'id': 'challenge-id',
+                        'type': 'sms',
+                    },
+                },
+            },
+        }
+
+        with self.assertRaises(robinhood_auth.RobinhoodVerificationRequired) as context:
+            robinhood_auth.login_to_robinhood('user@example.com', 'secret')
+
+        self.assertTrue(context.exception.mfa_code_required)
+        self.assertEqual(
+            context.exception.pending_login['workflow_id'],
+            'workflow-id',
+        )
+        self.assertEqual(self.mock_request_post.call_count, 2)
+        self.mock_request_get.assert_called_once()
+        self.mock_sleep.assert_not_called()
+        mock_generate_device_token.assert_called_once()
+        mock_login_url.assert_called_once()
+
+    @patch('robinhood_auth.robin_auth._validate_sherrif_id')
+    def test_complete_pending_login_validates_workflow_and_retries_token_request(
+        self,
+        mock_validate_sheriff_id,
+    ):
+        pending_login = {
+            'payload': {'username': 'user@example.com'},
+            'login_url': 'https://login.example',
+            'device_token': 'device-token',
+            'workflow_id': 'workflow-id',
+        }
+        self.mock_request_post.return_value = {
+            'access_token': 'access-token',
+            'token_type': 'Bearer',
+            'refresh_token': 'refresh-token',
+        }
+
+        login_response = robinhood_auth.complete_pending_login(
+            pending_login,
+            '123456',
+        )
+
+        self.assertEqual(login_response['access_token'], 'access-token')
+        mock_validate_sheriff_id.assert_called_once_with(
+            device_token='device-token',
+            workflow_id='workflow-id',
+            mfa_code='123456',
+        )
+        self.mock_request_post.assert_called_once_with(
+            'https://login.example',
+            {'username': 'user@example.com'},
+        )
+
+    @patch('robinhood_auth.robin_auth.login_url', return_value='https://login.example')
+    @patch('robinhood_auth.robin_auth.generate_device_token', return_value='device-token')
+    def test_login_reports_code_challenge_without_canceling_as_auth_error(
+        self,
+        mock_generate_device_token,
+        mock_login_url,
+    ):
+        self.mock_request_post.return_value = {
+            'challenge': {
+                'id': 'challenge-id',
+            },
+        }
+
+        with self.assertRaises(robinhood_auth.RobinhoodVerificationRequired):
+            robinhood_auth.login_to_robinhood('user@example.com', 'secret')
+
+        self.mock_sleep.assert_not_called()
+        mock_generate_device_token.assert_called_once()
+        mock_login_url.assert_called_once()
 
 
 if __name__ == '__main__':

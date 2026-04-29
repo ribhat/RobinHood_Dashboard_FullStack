@@ -2,16 +2,26 @@ import { useEffect, useState } from "react";
 import { Alert, Button, Card, Form, Spinner } from "react-bootstrap";
 
 const MFA_REQUIRED_MESSAGE =
-  "Robinhood is waiting for MFA confirmation. Approve the prompt or enter the MFA code, then submit again.";
+  "Robinhood needs phone approval. Approve the prompt in the Robinhood app, then keep this page open.";
+const MFA_CODE_REQUIRED_MESSAGE =
+  "Robinhood requires an MFA code. Enter the current code, then press Log in again.";
 const MFA_PENDING_MESSAGE =
-  "Robinhood may be waiting for MFA approval. Check your phone and approve the Robinhood prompt to continue.";
+  "Robinhood is waiting for phone approval. Check your Robinhood app and approve the prompt to continue.";
 
 const isMfaRequiredError = (error) =>
   Boolean(
     error?.mfaRequired ||
       error?.data?.mfa_required ||
       error?.code === "mfa_required" ||
+      error?.code === "mfa_code_required" ||
       error?.status === 409,
+  );
+
+const isMfaCodeRequiredError = (error) =>
+  Boolean(
+    error?.mfaCodeRequired ||
+      error?.data?.mfa_code_required ||
+      error?.code === "mfa_code_required",
   );
 
 const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
@@ -22,6 +32,7 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
   });
   const [formError, setFormError] = useState(null);
   const [loginRequiresMfa, setLoginRequiresMfa] = useState(false);
+  const [loginRequiresMfaCode, setLoginRequiresMfaCode] = useState(false);
   const [showPendingMfaHint, setShowPendingMfaHint] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -33,7 +44,11 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
   if (showMfaMessage) {
     loginMessage = MFA_REQUIRED_MESSAGE;
   }
-  const loginMessageVariant = showMfaMessage || showPendingMfaHint ? "warning" : "danger";
+  if (loginRequiresMfaCode) {
+    loginMessage = MFA_CODE_REQUIRED_MESSAGE;
+  }
+  const loginMessageVariant =
+    showMfaMessage || showPendingMfaHint || loginRequiresMfaCode ? "warning" : "danger";
 
   useEffect(() => {
     if (!isSubmitting) {
@@ -62,6 +77,7 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
     event.preventDefault();
     setFormError(null);
     setLoginRequiresMfa(false);
+    setLoginRequiresMfaCode(false);
     setShowPendingMfaHint(false);
 
     if (!formValues.username.trim() || !formValues.password) {
@@ -78,7 +94,10 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
         mfa_code: formValues.mfa_code.trim() || undefined,
       });
     } catch (loginError) {
-      if (isMfaRequiredError(loginError)) {
+      if (isMfaCodeRequiredError(loginError)) {
+        setLoginRequiresMfaCode(true);
+        setFormError(MFA_CODE_REQUIRED_MESSAGE);
+      } else if (isMfaRequiredError(loginError)) {
         setLoginRequiresMfa(true);
         setFormError(MFA_REQUIRED_MESSAGE);
       } else {
@@ -138,7 +157,7 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
                 inputMode="numeric"
                 name="mfa_code"
                 onChange={handleChange}
-                placeholder="Optional"
+                placeholder={loginRequiresMfaCode ? "Required" : "Only if Robinhood asks"}
                 type="text"
                 value={formValues.mfa_code}
               />
@@ -153,7 +172,7 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
                   size="sm"
                 />
               )}
-              {isSubmitting ? "Logging in..." : "Log in"}
+              {showPendingMfaHint ? "Waiting for approval..." : isSubmitting ? "Logging in..." : "Log in"}
             </Button>
           </Form>
         </Card.Body>

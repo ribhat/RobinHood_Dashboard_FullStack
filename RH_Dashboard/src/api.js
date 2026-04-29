@@ -17,6 +17,7 @@ export async function fetchJson(path, options = {}) {
     error.data = data;
     error.code = data.code;
     error.mfaRequired = Boolean(data.mfa_required);
+    error.mfaCodeRequired = Boolean(data.mfa_code_required);
     throw error;
   }
 

@@ -245,20 +245,138 @@ def get_dashboard_snapshot(year=None):
     yearly_dividends = get_yearly_dividend_summary(year_text)
     income_projection = get_dividend_projection(year_text)
     income_calendar = get_income_calendar(year_text, income_projection)
+    portfolio_overview = build_portfolio_overview(
+        portfolio,
+        holdings,
+        income_projection,
+    )
+    warnings = build_dashboard_warnings(
+        holdings,
+        yearly_dividends,
+        income_projection,
+        portfolio_overview,
+    )
 
     return {
         "portfolio": portfolio,
-        "portfolio_overview": build_portfolio_overview(
-            portfolio,
-            holdings,
-            income_projection,
-        ),
+        "portfolio_overview": portfolio_overview,
         "holdings": holdings,
         "yearly_dividends": yearly_dividends,
         "income_projection": income_projection,
         "income_calendar": income_calendar,
         "selected_year": int(year_text),
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "warnings": warnings,
+        "data_sources": build_dashboard_data_sources(income_projection),
+        "partial_data_available": bool(warnings),
+    }
+
+
+def build_dashboard_warnings(
+    holdings,
+    yearly_dividends,
+    income_projection,
+    portfolio_overview,
+):
+    warnings = []
+    holdings = holdings or {}
+    yearly_dividends = yearly_dividends or {}
+    income_projection = income_projection or {}
+    portfolio_overview = portfolio_overview or {}
+    cost_basis_coverage = portfolio_overview.get("cost_basis_coverage", {})
+    current_holdings_estimate = income_projection.get("current_holdings_estimate", {})
+    unmodeled_tickers = current_holdings_estimate.get("unmodeled_tickers", [])
+    rate_limited_tickers = current_holdings_estimate.get("rate_limited_tickers", [])
+    external_lookup_used = current_holdings_estimate.get("external_lookup_used", [])
+    unavailable_cost_basis_count = cost_basis_coverage.get(
+        "unavailable_position_count",
+        0,
+    )
+
+    if not holdings:
+        warnings.append({
+            "code": "holdings_empty",
+            "severity": "warning",
+            "message": "No open holdings were returned by Robinhood.",
+        })
+
+    if yearly_dividends.get("total", 0) == 0:
+        warnings.append({
+            "code": "dividends_empty",
+            "severity": "info",
+            "message": "No dividend payments were found for the selected year.",
+        })
+
+    if unavailable_cost_basis_count:
+        warnings.append({
+            "code": "missing_cost_basis",
+            "severity": "info",
+            "count": unavailable_cost_basis_count,
+            "message": (
+                f"Cost basis is unavailable for {unavailable_cost_basis_count} "
+                "position(s), so gain/loss totals may be partial."
+            ),
+        })
+
+    if unmodeled_tickers:
+        warnings.append({
+            "code": "unmodeled_dividend_schedule",
+            "severity": "warning",
+            "tickers": sorted(unmodeled_tickers),
+            "message": (
+                "Dividend schedules could not be estimated for "
+                f"{', '.join(sorted(unmodeled_tickers))}."
+            ),
+        })
+
+    if rate_limited_tickers:
+        warnings.append({
+            "code": "external_lookup_rate_limited",
+            "severity": "warning",
+            "tickers": sorted(rate_limited_tickers),
+            "message": (
+                "Polygon fallback lookups were skipped for "
+                f"{', '.join(sorted(rate_limited_tickers))} to stay under the free limit."
+            ),
+        })
+
+    if external_lookup_used:
+        warnings.append({
+            "code": "external_lookup_used",
+            "severity": "info",
+            "tickers": sorted(external_lookup_used),
+            "message": (
+                "Polygon fallback filled dividend schedules for "
+                f"{', '.join(sorted(external_lookup_used))}."
+            ),
+        })
+
+    return warnings
+
+
+def build_dashboard_data_sources(income_projection):
+    current_holdings_estimate = (
+        income_projection
+        or {}
+    ).get("current_holdings_estimate", {})
+    external_lookup_used = current_holdings_estimate.get("external_lookup_used", [])
+    rate_limited_tickers = current_holdings_estimate.get("rate_limited_tickers", [])
+
+    return {
+        "robinhood": {
+            "enabled": True,
+            "provides": [
+                "portfolio_profile",
+                "holdings",
+                "dividend_history",
+            ],
+        },
+        "polygon": {
+            "enabled": bool(os.getenv("POLYGON_API_KEY")),
+            "provides": ["dividend_schedule_fallback"],
+            "used_for_tickers": sorted(external_lookup_used),
+            "rate_limited_tickers": sorted(rate_limited_tickers),
+        },
     }
 
 

@@ -86,6 +86,16 @@ const IncomeCalendar = ({ data }) => {
   const currentMonthBucket = sortedMonths.find((month) => month.month === currentMonth);
   const currentMonthLabel = currentMonthBucket?.month_name || "Current Month";
 
+  if (sortedMonths.length === 0) {
+    return (
+      <section className="income-calendar-card" aria-label="Dividend income calendar">
+        <div className="panel-state empty-state">
+          No received or estimated dividend payments are available yet.
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="income-calendar-card" aria-label="Dividend income calendar">
       <div className="income-calendar-header">
