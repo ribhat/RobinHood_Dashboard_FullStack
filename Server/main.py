@@ -1,3 +1,5 @@
+import logging
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dashboard_data import (
@@ -22,6 +24,9 @@ from robinhood_auth import (
 
 app = Flask(__name__)
 CORS(app)
+logging.basicConfig(level=logging.INFO)
+app.logger.setLevel(logging.INFO)
+logging.getLogger('robinhood_auth').setLevel(logging.INFO)
 
 robinhood_login = None
 robinhood_auth_error = None
@@ -74,6 +79,15 @@ def api_error(error, status=500, **extra_fields):
     return jsonify({'error': str(error), **extra_fields}), status
 
 
+def log_api_error(error, status):
+    app.logger.warning(
+        "API request failed: path=%s status=%s error_type=%s",
+        request.path,
+        status,
+        type(error).__name__,
+    )
+
+
 def run_robinhood_request(callback):
     try:
         ensure_robinhood_login()
@@ -83,8 +97,14 @@ def run_robinhood_request(callback):
     try:
         return callback()
     except InvalidInputError as error:
+        log_api_error(error, 400)
         return api_error(error, 400)
     except Exception as error:
+        app.logger.exception(
+            "Unhandled API request failure: path=%s error_type=%s",
+            request.path,
+            type(error).__name__,
+        )
         return api_error(error)
 
 
@@ -131,6 +151,7 @@ def auth_login():
     except RobinhoodVerificationRequired as error:
         robinhood_auth_error = str(error)
         robinhood_auth_requires_mfa = True
+        log_api_error(error, 409)
         return api_error(
             error,
             409,
@@ -141,6 +162,7 @@ def auth_login():
     except RobinhoodAuthError as error:
         robinhood_auth_error = str(error)
         robinhood_auth_requires_mfa = False
+        log_api_error(error, 401)
         return api_error(error, 401)
 
 

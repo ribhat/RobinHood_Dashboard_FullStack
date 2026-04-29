@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Alert, Button, Card, Form, Spinner } from "react-bootstrap";
 
 const MFA_REQUIRED_MESSAGE =
-  "Robinhood is waiting for MFA confirmation. Approve the prompt or enter the MFA code, then submit again.";
+  "Robinhood needs verification. Approve the prompt on your phone or enter the MFA code, then keep this page open.";
 const MFA_PENDING_MESSAGE =
-  "Robinhood may be waiting for MFA approval. Check your phone and approve the Robinhood prompt to continue.";
+  "Robinhood is waiting for MFA approval. Check your phone and approve the prompt to continue.";
 
 const isMfaRequiredError = (error) =>
   Boolean(
@@ -153,7 +153,7 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
                   size="sm"
                 />
               )}
-              {isSubmitting ? "Logging in..." : "Log in"}
+              {showPendingMfaHint ? "Waiting for approval..." : isSubmitting ? "Logging in..." : "Log in"}
             </Button>
           </Form>
         </Card.Body>

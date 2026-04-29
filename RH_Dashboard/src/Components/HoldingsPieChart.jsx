@@ -28,8 +28,9 @@ const HoldingsPieChart = ({ data }) => {
   let chartData = Object.entries(data)
     .map(([ticker, details]) => ({
       name: ticker,
-      value: parseFloat(details.equity),
+      value: Number(details.equity || 0),
     }))
+    .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value);
 
   // Calculate total equity for all holdings
@@ -200,6 +201,14 @@ export const HoldingsTable = ({ data, showPerformance = false }) => {
 
     return `${label} (${sortConfig.direction})`;
   };
+
+  if (holdingsRows.length === 0) {
+    return (
+      <div className="panel-state empty-state">
+        No holdings were returned for the current Robinhood session.
+      </div>
+    );
+  }
 
   return (
       <div className="holdings-table-wrap" aria-label="Holdings details">

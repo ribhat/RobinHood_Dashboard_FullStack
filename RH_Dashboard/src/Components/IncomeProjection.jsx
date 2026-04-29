@@ -9,9 +9,19 @@ const formatDate = (dateText) =>
 const getPaymentDate = (payment) => payment.actual_date || payment.expected_date;
 
 const IncomeProjection = ({ data }) => {
+  if (!data) {
+    return (
+      <section className="projection-card" aria-label="Dividend income projection">
+        <div className="panel-state empty-state">
+          Dividend projections need holdings and dividend history to model income.
+        </div>
+      </section>
+    );
+  }
+
   const previousYearTotal = data.previous_year_actual_total;
   const currentYearCollected = data.current_year_collected;
-  const currentHoldingsEstimate = data.current_holdings_estimate;
+  const currentHoldingsEstimate = data.current_holdings_estimate || {};
   const projectionDetails = currentHoldingsEstimate.details || [];
   const progressPercent =
     previousYearTotal > 0
@@ -113,7 +123,12 @@ const IncomeProjection = ({ data }) => {
             Polygon fallback skipped {rateLimitedTickers.join(", ")} to stay under the free request limit.
           </p>
         )}
-        {projectionDetails.length > 0 && (
+        {projectionDetails.length === 0 ? (
+          <div className="projection-empty-state">
+            No modeled dividend schedule is available yet. This usually means the
+            current holdings do not have prior-year dividend records in Robinhood.
+          </div>
+        ) : (
           <div className="projection-detail">
             <div className="projection-section-header">
               <h3>Modeled Dividend Schedule</h3>
