@@ -1,14 +1,54 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Button, Card, Form, Spinner } from "react-bootstrap";
 
-const LoginPage = ({ error, onLogin }) => {
+const MFA_REQUIRED_MESSAGE =
+  "Robinhood is waiting for MFA confirmation. Approve the prompt or enter the MFA code, then submit again.";
+const MFA_PENDING_MESSAGE =
+  "Robinhood may be waiting for MFA approval. Check your phone and approve the Robinhood prompt to continue.";
+
+const isMfaRequiredError = (error) =>
+  Boolean(
+    error?.mfaRequired ||
+      error?.data?.mfa_required ||
+      error?.code === "mfa_required" ||
+      error?.status === 409,
+  );
+
+const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
   const [formValues, setFormValues] = useState({
     username: "",
     password: "",
     mfa_code: "",
   });
   const [formError, setFormError] = useState(null);
+  const [loginRequiresMfa, setLoginRequiresMfa] = useState(false);
+  const [showPendingMfaHint, setShowPendingMfaHint] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const showMfaMessage = mfaRequired || loginRequiresMfa;
+  let loginMessage = formError || error;
+  if (showPendingMfaHint) {
+    loginMessage = MFA_PENDING_MESSAGE;
+  }
+  if (showMfaMessage) {
+    loginMessage = MFA_REQUIRED_MESSAGE;
+  }
+  const loginMessageVariant = showMfaMessage || showPendingMfaHint ? "warning" : "danger";
+
+  useEffect(() => {
+    if (!isSubmitting) {
+      setShowPendingMfaHint(false);
+      return undefined;
+    }
+
+    const pendingMfaTimer = window.setTimeout(() => {
+      setShowPendingMfaHint(true);
+    }, 1500);
+
+    return () => {
+      window.clearTimeout(pendingMfaTimer);
+    };
+  }, [isSubmitting]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -21,6 +61,8 @@ const LoginPage = ({ error, onLogin }) => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setFormError(null);
+    setLoginRequiresMfa(false);
+    setShowPendingMfaHint(false);
 
     if (!formValues.username.trim() || !formValues.password) {
       setFormError("Enter your Robinhood username and password.");
@@ -36,7 +78,12 @@ const LoginPage = ({ error, onLogin }) => {
         mfa_code: formValues.mfa_code.trim() || undefined,
       });
     } catch (loginError) {
-      setFormError(loginError.message);
+      if (isMfaRequiredError(loginError)) {
+        setLoginRequiresMfa(true);
+        setFormError(MFA_REQUIRED_MESSAGE);
+      } else {
+        setFormError(loginError.message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -52,9 +99,9 @@ const LoginPage = ({ error, onLogin }) => {
             <p>Log in locally to load your portfolio and dividend data.</p>
           </div>
 
-          {(formError || error) && (
-            <Alert className="login-alert" variant="danger">
-              {formError || error}
+          {loginMessage && (
+            <Alert className="login-alert" variant={loginMessageVariant}>
+              {loginMessage}
             </Alert>
           )}
 

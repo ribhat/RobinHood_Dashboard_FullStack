@@ -14,6 +14,9 @@ export async function fetchJson(path, options = {}) {
   if (!response.ok) {
     const error = new Error(data.error || "Unable to load dashboard data.");
     error.status = response.status;
+    error.data = data;
+    error.code = data.code;
+    error.mfaRequired = Boolean(data.mfa_required);
     throw error;
   }
 
