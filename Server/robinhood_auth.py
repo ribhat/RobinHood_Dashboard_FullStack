@@ -163,6 +163,7 @@ def complete_login_response(
                         payload,
                         login_url,
                         device_token,
+                        challenge_id=data["challenge"]["id"],
                     ),
                     mfa_code_required=True,
                 )
@@ -294,12 +295,14 @@ def build_pending_login_context(
     login_url,
     device_token,
     workflow_id=None,
+    challenge_id=None,
 ):
     return {
         "payload": dict(payload),
         "login_url": login_url,
         "device_token": device_token,
         "workflow_id": workflow_id,
+        "challenge_id": challenge_id,
         "created_at": time.monotonic(),
     }
 
@@ -321,6 +324,23 @@ def complete_pending_login(pending_login, mfa_code):
         )
 
     workflow_id = pending_login.get("workflow_id")
+    challenge_id = pending_login.get("challenge_id")
+
+    if challenge_id:
+        data = complete_challenge(
+            challenge_id,
+            pending_login["payload"],
+            pending_login["login_url"],
+            mfa_text,
+        )
+        return complete_login_response(
+            data,
+            pending_login["payload"],
+            pending_login["login_url"],
+            pending_login["device_token"],
+            mfa_text,
+        )
+
     if workflow_id:
         robin_auth._validate_sherrif_id(
             device_token=pending_login["device_token"],

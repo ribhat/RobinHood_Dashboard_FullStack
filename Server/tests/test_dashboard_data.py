@@ -3,6 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import ANY, Mock, patch
 
+from flask import Flask
+
 
 SERVER_DIR = Path(__file__).resolve().parents[1]
 if str(SERVER_DIR) not in sys.path:
@@ -773,18 +775,61 @@ class ApiAuthTests(unittest.TestCase):
         mock_snapshot.assert_not_called()
 
 
+class CorsConfigurationTests(unittest.TestCase):
+    def build_test_app(self):
+        app = Flask(__name__)
+        main.configure_cors(app)
+
+        @app.route('/api/example')
+        def example():
+            return {'ok': True}
+
+        return app.test_client()
+
+    @patch.dict('os.environ', {'CORS_ALLOWED_ORIGINS': ''})
+    def test_allows_default_vite_origin(self):
+        client = self.build_test_app()
+
+        response = client.get(
+            '/api/example',
+            headers={'Origin': 'http://localhost:5173'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers.get('Access-Control-Allow-Origin'),
+            'http://localhost:5173',
+        )
+
+    @patch.dict('os.environ', {'CORS_ALLOWED_ORIGINS': ''})
+    def test_rejects_unconfigured_origin(self):
+        client = self.build_test_app()
+
+        response = client.get(
+            '/api/example',
+            headers={'Origin': 'https://evil.example'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.headers.get('Access-Control-Allow-Origin'))
+
+
 class RobinhoodAuthFlowTests(unittest.TestCase):
     def setUp(self):
         self.request_post_patcher = patch('robinhood_auth.robin_auth.request_post')
         self.request_get_patcher = patch('robinhood_auth.robin_auth.request_get')
         self.update_session_patcher = patch('robinhood_auth.robin_auth.update_session')
         self.set_login_state_patcher = patch('robinhood_auth.robin_auth.set_login_state')
+        self.respond_to_challenge_patcher = patch(
+            'robinhood_auth.robin_auth.respond_to_challenge'
+        )
         self.sleep_patcher = patch('robinhood_auth.time.sleep')
 
         self.mock_request_post = self.request_post_patcher.start()
         self.mock_request_get = self.request_get_patcher.start()
         self.mock_update_session = self.update_session_patcher.start()
         self.mock_set_login_state = self.set_login_state_patcher.start()
+        self.mock_respond_to_challenge = self.respond_to_challenge_patcher.start()
         self.mock_sleep = self.sleep_patcher.start()
 
     def tearDown(self):
@@ -792,6 +837,7 @@ class RobinhoodAuthFlowTests(unittest.TestCase):
         self.request_get_patcher.stop()
         self.update_session_patcher.stop()
         self.set_login_state_patcher.stop()
+        self.respond_to_challenge_patcher.stop()
         self.sleep_patcher.stop()
 
     @patch('robinhood_auth.robin_auth.login_url', return_value='https://login.example')
@@ -1064,12 +1110,49 @@ class RobinhoodAuthFlowTests(unittest.TestCase):
             },
         }
 
-        with self.assertRaises(robinhood_auth.RobinhoodVerificationRequired):
+        with self.assertRaises(robinhood_auth.RobinhoodVerificationRequired) as context:
             robinhood_auth.login_to_robinhood('user@example.com', 'secret')
 
+        self.assertEqual(
+            context.exception.pending_login['challenge_id'],
+            'challenge-id',
+        )
         self.mock_sleep.assert_not_called()
         mock_generate_device_token.assert_called_once()
         mock_login_url.assert_called_once()
+
+    def test_complete_pending_login_responds_to_pending_challenge(self):
+        pending_login = {
+            'payload': {'username': 'user@example.com'},
+            'login_url': 'https://login.example',
+            'device_token': 'device-token',
+            'challenge_id': 'challenge-id',
+        }
+        self.mock_respond_to_challenge.return_value = {'status': 'validated'}
+        self.mock_request_post.return_value = {
+            'access_token': 'access-token',
+            'token_type': 'Bearer',
+            'refresh_token': 'refresh-token',
+        }
+
+        login_response = robinhood_auth.complete_pending_login(
+            pending_login,
+            '123456',
+        )
+
+        self.assertEqual(login_response['access_token'], 'access-token')
+        self.mock_respond_to_challenge.assert_called_once_with(
+            'challenge-id',
+            '123456',
+        )
+        self.mock_update_session.assert_any_call(
+            'X-ROBINHOOD-CHALLENGE-RESPONSE-ID',
+            'challenge-id',
+        )
+        self.mock_request_post.assert_called_once_with(
+            'https://login.example',
+            {'username': 'user@example.com'},
+        )
 
 
 if __name__ == '__main__':

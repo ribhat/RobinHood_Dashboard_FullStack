@@ -1,4 +1,5 @@
 import logging
+import os
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -24,10 +25,41 @@ from robinhood_auth import (
 )
 
 app = Flask(__name__)
-CORS(app)
 logging.basicConfig(level=logging.INFO)
 app.logger.setLevel(logging.INFO)
 logging.getLogger('robinhood_auth').setLevel(logging.INFO)
+
+DEFAULT_ALLOWED_CORS_ORIGINS = (
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+)
+
+
+def get_allowed_cors_origins():
+    configured_origins = os.getenv('CORS_ALLOWED_ORIGINS')
+
+    if not configured_origins:
+        return list(DEFAULT_ALLOWED_CORS_ORIGINS)
+
+    return [
+        origin.strip()
+        for origin in configured_origins.split(',')
+        if origin.strip()
+    ]
+
+
+def configure_cors(flask_app):
+    CORS(
+        flask_app,
+        resources={
+            r'/api/*': {
+                'origins': get_allowed_cors_origins(),
+            },
+        },
+    )
+
+
+configure_cors(app)
 
 robinhood_login = None
 robinhood_auth_error = None
