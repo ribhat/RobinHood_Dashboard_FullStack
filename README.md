@@ -89,6 +89,12 @@ If you want to start the app without opening a browser:
 python .\launch_dashboard.py --no-browser
 ```
 
+## Local Logs
+
+Runtime and dev-server logs are local debugging artifacts, not source files. If
+you capture backend or frontend output to disk, keep those files in `logs/`.
+Log files are ignored by git.
+
 Manual startup still works:
 
 1. In the terminal, navigate to the project directory.
