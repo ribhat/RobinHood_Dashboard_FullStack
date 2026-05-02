@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.log
 .codex/
+.superpowers/
 
 .env
 .tokens/
