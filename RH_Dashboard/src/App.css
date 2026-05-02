@@ -711,11 +711,14 @@
   background: #eef6ff;
   border: 1px solid #cce4ff;
   border-radius: 999px;
+  box-sizing: border-box;
   color: #145ea8;
   font-size: 0.85rem;
   font-weight: 650;
+  max-width: 100%;
   padding: 0.35rem 0.65rem;
-  white-space: nowrap;
+  text-align: center;
+  white-space: normal;
 }
 
 .income-calendar-summary {
@@ -987,7 +990,9 @@
 }
 
 .portfolio-metric-card {
+  container-type: inline-size;
   min-height: 132px;
+  min-width: 0;
 }
 
 .metric-footnote {
@@ -1024,9 +1029,14 @@
 .portfolio-insight-header {
   align-items: flex-start;
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
   justify-content: space-between;
   margin-bottom: 1rem;
+}
+
+.portfolio-insight-header > div {
+  min-width: 0;
 }
 
 .portfolio-insight-header h2 {
@@ -1048,6 +1058,7 @@
   background: #f8fafc;
   border: 1px solid #e5eaf1;
   border-radius: 8px;
+  container-type: inline-size;
   min-width: 0;
   padding: 1rem;
 }
@@ -1081,6 +1092,12 @@
   padding-bottom: 0;
 }
 
+.performance-row > div:first-child,
+.top-holding-row > div:first-child,
+.performance-values {
+  min-width: 0;
+}
+
 .performance-row strong,
 .top-holding-row strong {
   color: #18283a;
@@ -1103,6 +1120,26 @@
 .performance-values,
 .top-holding-row > div:last-child {
   text-align: right;
+}
+
+.performance-values strong,
+.performance-values span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container (max-width: 14rem) {
+  .performance-row {
+    align-items: start;
+    gap: 0.35rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .performance-values {
+    text-align: left;
+  }
 }
 
 .portfolio-empty-state {
@@ -1138,6 +1175,69 @@
 
 .portfolio-meter-label strong {
   color: #18283a;
+}
+
+.meter-label-with-tooltip {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.info-tooltip {
+  display: inline-flex;
+  position: relative;
+}
+
+.info-tooltip-trigger {
+  align-items: center;
+  background: #f2f7fd;
+  border: 1px solid #b9d7f4;
+  border-radius: 999px;
+  color: #145ea8;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 800;
+  height: 1.05rem;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 1.05rem;
+}
+
+.info-tooltip-trigger:focus-visible {
+  box-shadow: 0 0 0 3px rgba(20, 94, 168, 0.2);
+  outline: 0;
+}
+
+.info-tooltip-content {
+  background: #102033;
+  border-radius: 8px;
+  bottom: calc(100% + 0.45rem);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.2);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 650;
+  left: 50%;
+  line-height: 1.35;
+  max-width: min(17rem, calc(100vw - 2rem));
+  opacity: 0;
+  padding: 0.6rem 0.7rem;
+  pointer-events: none;
+  position: absolute;
+  text-align: left;
+  transform: translate(-50%, 0.25rem);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  visibility: hidden;
+  width: max-content;
+  z-index: 5;
+}
+
+.info-tooltip:hover .info-tooltip-content,
+.info-tooltip:focus-within .info-tooltip-content {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
 }
 
 .portfolio-meter {
@@ -1640,10 +1740,17 @@
 .status-card,
 .metric-card {
   align-items: center;
+  container-type: inline-size;
   display: flex;
   gap: 1rem;
   min-height: 7rem;
   padding: 1rem 1.15rem;
+}
+
+.metric-card-copy {
+  container-type: inline-size;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .status-card strong {
@@ -1779,6 +1886,38 @@
 .summary-value {
   color: #07111f;
   font-family: Georgia, "Times New Roman", serif;
+}
+
+.metric-card .summary-label,
+.metric-card .metric-footnote,
+.portfolio-metric-card .summary-label,
+.portfolio-metric-card .metric-footnote {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-card-value,
+.portfolio-metric-value {
+  display: block;
+  font-size: clamp(1rem, 15cqi, 2.25rem);
+  line-height: 1.05;
+  max-width: 100%;
+  overflow-wrap: normal;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+@container (max-width: 16rem) {
+  .metric-card {
+    gap: 0.75rem;
+  }
+
+  .metric-card .metric-icon {
+    height: 2.8rem;
+    width: 2.8rem;
+  }
 }
 
 .positive-metric {

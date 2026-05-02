@@ -14,7 +14,7 @@ const MetricCard = ({
     )}
     <div className="metric-card-copy">
       <span className="summary-label">{label}</span>
-      <strong className="summary-value">{value}</strong>
+      <strong className="summary-value metric-card-value">{value}</strong>
       {trend && (
         <span className={`metric-footnote ${trend.className || ""}`}>
           {trend.text}

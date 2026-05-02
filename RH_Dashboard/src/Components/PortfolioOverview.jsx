@@ -28,6 +28,9 @@ const getToneClass = (value) => {
   return Number(value) > 0 ? "positive-metric" : "negative-metric";
 };
 
+const COST_BASIS_COVERAGE_HELP =
+  "Cost basis coverage is the share of positions where purchase cost data is available. It is needed to calculate gain/loss and returns.";
+
 const PerformanceList = ({ title, positions }) => (
   <div className="performance-list">
     <h3>{title}</h3>
@@ -39,11 +42,19 @@ const PerformanceList = ({ title, positions }) => (
             <span>{position.name}</span>
           </div>
           <div className="performance-values">
-            <strong className={getToneClass(position.unrealized_gain_loss)}>
-              {formatSignedCurrency(position.unrealized_gain_loss)}
-            </strong>
-            <span className={getToneClass(position.unrealized_return_percent)}>
+            <strong
+              className={`performance-primary-value ${getToneClass(
+                position.unrealized_return_percent
+              )}`}
+            >
               {formatPercent(position.unrealized_return_percent)}
+            </strong>
+            <span
+              className={`performance-secondary-value ${getToneClass(
+                position.unrealized_gain_loss
+              )}`}
+            >
+              {formatSignedCurrency(position.unrealized_gain_loss)}
             </span>
           </div>
         </div>
@@ -69,12 +80,18 @@ const PortfolioOverview = ({ data }) => {
       <div className="portfolio-metric-grid">
         <div className="summary-card portfolio-metric-card">
           <span className="summary-label">Portfolio Value</span>
-          <strong className="summary-value">{formatCurrency(data?.total_equity)}</strong>
+          <strong className="summary-value portfolio-metric-value">
+            {formatCurrency(data?.total_equity)}
+          </strong>
           <span className="metric-footnote">{data?.position_count || 0} positions</span>
         </div>
         <div className="summary-card portfolio-metric-card">
           <span className="summary-label">Unrealized Gain/Loss</span>
-          <strong className={`summary-value ${getToneClass(data?.unrealized_gain_loss)}`}>
+          <strong
+            className={`summary-value portfolio-metric-value ${getToneClass(
+              data?.unrealized_gain_loss
+            )}`}
+          >
             {formatSignedCurrency(data?.unrealized_gain_loss)}
           </strong>
           <span className={`metric-footnote ${getToneClass(data?.unrealized_return_percent)}`}>
@@ -83,7 +100,7 @@ const PortfolioOverview = ({ data }) => {
         </div>
         <div className="summary-card portfolio-metric-card">
           <span className="summary-label">Estimated Annual Dividends</span>
-          <strong className="summary-value">
+          <strong className="summary-value portfolio-metric-value">
             {formatCurrency(data?.estimated_annual_dividend_income)}
           </strong>
           <span className="metric-footnote">
@@ -92,7 +109,7 @@ const PortfolioOverview = ({ data }) => {
         </div>
         <div className="summary-card portfolio-metric-card">
           <span className="summary-label">Largest Position</span>
-          <strong className="summary-value">
+          <strong className="summary-value portfolio-metric-value">
             {largestPosition ? largestPosition.ticker : "None"}
           </strong>
           <span className="metric-footnote">
@@ -141,7 +158,26 @@ const PortfolioOverview = ({ data }) => {
             </div>
             <div>
               <div className="portfolio-meter-label">
-                <span>Cost basis coverage</span>
+                <span className="meter-label-with-tooltip">
+                  Cost basis coverage
+                  <span className="info-tooltip">
+                    <button
+                      aria-describedby="cost-basis-coverage-tooltip"
+                      aria-label="What cost basis coverage means"
+                      className="info-tooltip-trigger"
+                      type="button"
+                    >
+                      i
+                    </button>
+                    <span
+                      className="info-tooltip-content"
+                      id="cost-basis-coverage-tooltip"
+                      role="tooltip"
+                    >
+                      {COST_BASIS_COVERAGE_HELP}
+                    </span>
+                  </span>
+                </span>
                 <strong>{formatPercent(coverage.coverage_percent)}</strong>
               </div>
               <div className="portfolio-meter coverage-meter">
