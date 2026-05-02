@@ -71,6 +71,26 @@ The default frontend API URL is `http://localhost:5000`, so this step is only ne
 
 ## Running the App
 
+From the project root, start the full local dashboard with one command:
+
+```powershell
+python .\launch_dashboard.py
+```
+
+The launcher checks for the Flask entrypoint, frontend dependencies, `npm`,
+backend Python packages, and whether ports `5000` or `5173` are already in use.
+It starts the Flask API and Vite frontend, waits for both to respond, then opens
+the dashboard in your default browser. Leave the terminal open while using the
+app and press `Ctrl+C` to stop both processes.
+
+If you want to start the app without opening a browser:
+
+```powershell
+python .\launch_dashboard.py --no-browser
+```
+
+Manual startup still works:
+
 1. In the terminal, navigate to the project directory.
 
 2. Navigate to Server folder and run the Flask Server:
