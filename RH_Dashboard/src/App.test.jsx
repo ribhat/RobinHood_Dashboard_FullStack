@@ -14,7 +14,9 @@ vi.mock("./Components/HoldingsPieChart", () => ({
       Holdings chart {Object.keys(data || {}).length}
     </div>
   ),
-  HoldingsTable: () => <div data-testid="holdings-table">Holdings table</div>,
+  HoldingsTable: ({ data }) => (
+    <div data-testid="holdings-table">{Object.keys(data || {}).join(" ")}</div>
+  ),
 }));
 
 vi.mock("./Components/DividendChart", () => ({
@@ -75,6 +77,12 @@ const buildDashboardResponse = (year = new Date().getFullYear()) => ({
       quantity: "5",
       equity: "300.00",
       price: "60.00",
+    },
+    MSFT: {
+      name: "Microsoft Corporation",
+      quantity: "2",
+      equity: "700.00",
+      price: "350.00",
     },
   },
   yearly_dividends: {
@@ -149,22 +157,35 @@ const mockAuthenticatedDashboard = () => {
 };
 
 describe("App", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.clearAllMocks();
+  });
+
   it("shows dashboard status, sources, and backend data notes after load", async () => {
     mockAuthenticatedDashboard();
 
     render(<App />);
 
+    expect(
+      await screen.findByRole("heading", { name: "Portfolio Dashboard" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
     expect(await screen.findByText("Robinhood connected")).toBeInTheDocument();
-    expect(await screen.findByText("Partial data")).toBeInTheDocument();
+    expect(await screen.findAllByText("Partial data")).toHaveLength(2);
     expect(
       screen.getByText(/Cost basis is unavailable for 1 position/i)
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Robinhood portfolio, holdings, and dividend history/i)
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reports" })).toBeDisabled();
   });
 
-  it("remembers tab and dividend controls while loading comparison data", async () => {
+  it("switches views and remembers dividend controls while loading comparison data", async () => {
     const user = userEvent.setup();
     const currentYear = new Date().getFullYear();
     mockAuthenticatedDashboard();
@@ -172,9 +193,12 @@ describe("App", () => {
     render(<App />);
 
     await screen.findByText("Robinhood connected");
-    await user.click(screen.getByRole("tab", { name: "Dividends" }));
+    await user.click(screen.getByRole("button", { name: "Dividends" }));
+    expect(
+      screen.getByRole("heading", { name: "Dividends" })
+    ).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Dividend chart type"), "Line Graph");
-    await user.click(screen.getByLabelText(`Compare ${currentYear - 1}`));
+    await user.click(screen.getByLabelText("Compare Previous Year"));
 
     await waitFor(() => {
       expect(fetchJson).toHaveBeenCalledWith(
@@ -186,10 +210,27 @@ describe("App", () => {
       window.localStorage.getItem("rh-dashboard:preferences")
     );
     expect(storedPreferences).toMatchObject({
-      activeTab: "dividends",
+      activeView: "dividends",
       chartType: "Line Graph",
       comparePreviousYear: true,
     });
+  });
+
+  it("filters holdings by ticker or company name", async () => {
+    const user = userEvent.setup();
+    mockAuthenticatedDashboard();
+
+    render(<App />);
+
+    await screen.findByText("Robinhood connected");
+    await user.click(screen.getByRole("button", { name: "Holdings" }));
+    expect(screen.getByTestId("holdings-table")).toHaveTextContent("SCHD");
+    expect(screen.getByTestId("holdings-table")).toHaveTextContent("MSFT");
+
+    await user.type(screen.getByLabelText("Search holdings"), "schwab");
+
+    expect(screen.getByTestId("holdings-table")).toHaveTextContent("SCHD");
+    expect(screen.getByTestId("holdings-table")).not.toHaveTextContent("MSFT");
   });
 
   it("refreshes the dashboard snapshot on demand", async () => {

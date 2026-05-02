@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Card, Form, Spinner } from "react-bootstrap";
+import { Lock, ShieldCheck, TrendingUp, User, WalletCards } from "lucide-react";
+import BrandMark from "./Shell/BrandMark";
 
 const MFA_REQUIRED_MESSAGE =
   "Robinhood needs phone approval. Approve the prompt in the Robinhood app, then keep this page open.";
@@ -109,74 +111,139 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
   };
 
   return (
-    <main className="login-page">
-      <Card className="login-card">
-        <Card.Body>
-          <div className="login-header">
-            <span className="metric-kicker">Robinhood Session</span>
-            <h1>Dividend Dashboard</h1>
-            <p>Log in locally to load your portfolio and dividend data.</p>
+    <main className="login-page vault-login-page">
+      <section className="login-story-panel" aria-label="Dividend Vault benefits">
+        <BrandMark />
+        <div className="login-story-copy">
+          <h1>
+            Track your portfolio. Understand your <span>dividend income.</span>
+          </h1>
+          <div className="login-benefits">
+            <article>
+              <span aria-hidden="true">
+                <TrendingUp size={28} />
+              </span>
+              <div>
+                <strong>Portfolio allocation and performance</strong>
+                <p>See how your holdings are positioned and performing.</p>
+              </div>
+            </article>
+            <article>
+              <span aria-hidden="true">
+                <WalletCards size={28} />
+              </span>
+              <div>
+                <strong>Dividend income tracking</strong>
+                <p>Monitor income, yield, and growth over time.</p>
+              </div>
+            </article>
+            <article>
+              <span aria-hidden="true">
+                <ShieldCheck size={28} />
+              </span>
+              <div>
+                <strong>Secure Robinhood data sync</strong>
+                <p>Connect once. Your credentials stay local to this app flow.</p>
+              </div>
+            </article>
           </div>
+        </div>
+      </section>
 
-          {loginMessage && (
-            <Alert className="login-alert" variant={loginMessageVariant}>
-              {loginMessage}
-            </Alert>
-          )}
+      <section className="login-form-panel" aria-label="Sign in">
+        <Card className="login-card vault-login-card">
+          <Card.Body>
+            <div className="login-card-brand">
+              <BrandMark compact />
+            </div>
+            <div className="login-header">
+              <h1>Sign in</h1>
+              <p>Access your Dividend Vault dashboard</p>
+            </div>
 
-          <Form onSubmit={handleSubmit}>
-            <Form.Group className="mb-3" controlId="robinhood-username">
-              <Form.Label>Username</Form.Label>
-              <Form.Control
-                autoComplete="username"
-                disabled={isSubmitting}
-                name="username"
-                onChange={handleChange}
-                type="text"
-                value={formValues.username}
-              />
-            </Form.Group>
+            {loginMessage && (
+              <Alert className="login-alert" variant={loginMessageVariant}>
+                {loginMessage}
+              </Alert>
+            )}
 
-            <Form.Group className="mb-3" controlId="robinhood-password">
-              <Form.Label>Password</Form.Label>
-              <Form.Control
-                autoComplete="current-password"
-                disabled={isSubmitting}
-                name="password"
-                onChange={handleChange}
-                type="password"
-                value={formValues.password}
-              />
-            </Form.Group>
+            <Form onSubmit={handleSubmit}>
+              <Form.Group className="vault-form-group" controlId="robinhood-username">
+                <Form.Label>Email or username</Form.Label>
+                <div className="vault-input-shell">
+                  <User size={19} aria-hidden="true" />
+                  <Form.Control
+                    autoComplete="username"
+                    disabled={isSubmitting}
+                    name="username"
+                    onChange={handleChange}
+                    placeholder="Enter your email or username"
+                    type="text"
+                    value={formValues.username}
+                  />
+                </div>
+              </Form.Group>
 
-            <Form.Group className="mb-4" controlId="robinhood-mfa">
-              <Form.Label>MFA code</Form.Label>
-              <Form.Control
-                autoComplete="one-time-code"
-                disabled={isSubmitting}
-                inputMode="numeric"
-                name="mfa_code"
-                onChange={handleChange}
-                placeholder={loginRequiresMfaCode ? "Required" : "Only if Robinhood asks"}
-                type="text"
-                value={formValues.mfa_code}
-              />
-            </Form.Group>
+              <Form.Group className="vault-form-group" controlId="robinhood-password">
+                <Form.Label>Password</Form.Label>
+                <div className="vault-input-shell">
+                  <Lock size={19} aria-hidden="true" />
+                  <Form.Control
+                    autoComplete="current-password"
+                    disabled={isSubmitting}
+                    name="password"
+                    onChange={handleChange}
+                    placeholder="Enter your password"
+                    type="password"
+                    value={formValues.password}
+                  />
+                </div>
+              </Form.Group>
 
-            <Button className="login-submit" disabled={isSubmitting} type="submit">
-              {isSubmitting && (
-                <Spinner
-                  animation="border"
-                  aria-hidden="true"
-                  className="login-spinner"
-                  size="sm"
-                />
-              )}
-              {showPendingMfaHint ? "Waiting for approval..." : isSubmitting ? "Logging in..." : "Log in"}
-            </Button>
-          </Form>
-        </Card.Body>
-      </Card>
+              <Form.Group className="vault-form-group" controlId="robinhood-mfa">
+                <Form.Label>MFA code</Form.Label>
+                <div className="vault-input-shell">
+                  <ShieldCheck size={19} aria-hidden="true" />
+                  <Form.Control
+                    autoComplete="one-time-code"
+                    disabled={isSubmitting}
+                    inputMode="numeric"
+                    name="mfa_code"
+                    onChange={handleChange}
+                    placeholder={loginRequiresMfaCode ? "Required" : "Only if Robinhood asks"}
+                    type="text"
+                    value={formValues.mfa_code}
+                  />
+                </div>
+              </Form.Group>
+
+              <Button className="login-submit" disabled={isSubmitting} type="submit">
+                {isSubmitting && (
+                  <Spinner
+                    animation="border"
+                    aria-hidden="true"
+                    className="login-spinner"
+                    size="sm"
+                  />
+                )}
+                {showPendingMfaHint
+                  ? "Waiting for approval..."
+                  : isSubmitting
+                  ? "Signing in..."
+                  : "Sign In"}
+              </Button>
+            </Form>
+
+            <p className="login-verification-note">
+              You may be asked for a verification code.
+            </p>
+            <p className="login-security-note">
+              <ShieldCheck size={18} aria-hidden="true" />
+              Your credentials are encrypted in transit and never displayed.
+            </p>
+          </Card.Body>
+        </Card>
+      </section>
     </main>
   );
 };

@@ -125,7 +125,7 @@ const HoldingsPieChart = ({ data }) => {
   );
 };
 
-export const HoldingsTable = ({ data, showPerformance = false }) => {
+export const HoldingsTable = ({ data, showPerformance = false, searchQuery = "" }) => {
   const [sortConfig, setSortConfig] = useState({
     key: "equity",
     direction: "desc",
@@ -162,7 +162,15 @@ export const HoldingsTable = ({ data, showPerformance = false }) => {
       return row;
     });
 
-    return rows.sort((a, b) => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const filteredRows = normalizedQuery
+      ? rows.filter((row) =>
+          row.ticker.toLowerCase().includes(normalizedQuery) ||
+          row.name.toLowerCase().includes(normalizedQuery)
+        )
+      : rows;
+
+    return filteredRows.sort((a, b) => {
       const aValue = a[sortConfig.key];
       const bValue = b[sortConfig.key];
       const direction = sortConfig.direction === "asc" ? 1 : -1;
@@ -185,7 +193,7 @@ export const HoldingsTable = ({ data, showPerformance = false }) => {
 
       return (aValue - bValue) * direction;
     });
-  }, [data, sortConfig, totalEquity]);
+  }, [data, searchQuery, sortConfig, totalEquity]);
 
   const requestSort = (key) => {
     setSortConfig((currentSort) => ({
@@ -205,7 +213,9 @@ export const HoldingsTable = ({ data, showPerformance = false }) => {
   if (holdingsRows.length === 0) {
     return (
       <div className="panel-state empty-state">
-        No holdings were returned for the current Robinhood session.
+        {searchQuery
+          ? "No holdings match the current search."
+          : "No holdings were returned for the current Robinhood session."}
       </div>
     );
   }

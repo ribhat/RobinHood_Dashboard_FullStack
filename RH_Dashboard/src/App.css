@@ -1347,3 +1347,774 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Dividend Vault shell refresh */
+.vault-shell {
+  background: #f5f7fb;
+  color: #132033;
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.vault-sidebar {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(0, 161, 129, 0.16), transparent 28%),
+    linear-gradient(180deg, #06111d 0%, #03101b 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f8fbff;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-height: 100vh;
+  padding: 1.65rem 1rem;
+}
+
+.brand-mark {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.brand-bars {
+  align-items: flex-end;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 0.18rem;
+  grid-template-columns: repeat(3, 0.45rem);
+  height: 2.45rem;
+  transform: skewY(-22deg);
+}
+
+.brand-bars span {
+  border-radius: 0.12rem 0.12rem 0.04rem 0.04rem;
+  box-shadow: 0 0.45rem 1.25rem rgba(0, 0, 0, 0.18);
+  display: block;
+}
+
+.brand-bars span:nth-child(1) {
+  background: #15b99a;
+  height: 1.35rem;
+}
+
+.brand-bars span:nth-child(2) {
+  background: #f2b84b;
+  height: 2rem;
+}
+
+.brand-bars span:nth-child(3) {
+  background: #2da9c7;
+  height: 2.45rem;
+}
+
+.brand-copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.brand-copy strong {
+  color: #ffffff;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.brand-copy span {
+  color: #f2b84b;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.brand-mark-compact {
+  background: #06111d;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  box-shadow: 0 12px 28px rgba(4, 17, 29, 0.18);
+  display: inline-flex;
+  height: 3.25rem;
+  justify-content: center;
+  width: 3.25rem;
+}
+
+.brand-mark-compact .brand-bars {
+  grid-template-columns: repeat(3, 0.34rem);
+  height: 1.85rem;
+}
+
+.brand-mark-compact .brand-bars span:nth-child(1) {
+  height: 1rem;
+}
+
+.brand-mark-compact .brand-bars span:nth-child(2) {
+  height: 1.45rem;
+}
+
+.brand-mark-compact .brand-bars span:nth-child(3) {
+  height: 1.85rem;
+}
+
+.vault-nav {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.vault-nav-button,
+.support-button,
+.vault-action-button {
+  align-items: center;
+  border: 0;
+  display: inline-flex;
+  gap: 0.7rem;
+  justify-content: flex-start;
+}
+
+.vault-nav-button {
+  background: transparent;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 700;
+  min-height: 2.85rem;
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  width: 100%;
+}
+
+.vault-nav-button:hover:not(:disabled),
+.vault-nav-button.active {
+  background: linear-gradient(135deg, #08956f, #02a77f);
+  color: #ffffff;
+}
+
+.vault-nav-button:disabled {
+  color: rgba(255, 255, 255, 0.44);
+  cursor: not-allowed;
+}
+
+.market-snapshot {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  margin-top: auto;
+  padding: 1rem;
+}
+
+.market-snapshot div {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.market-snapshot strong {
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.market-snapshot span {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: #c7d4e6;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+}
+
+.market-snapshot p {
+  color: #9baabe;
+  font-size: 0.82rem;
+  margin: 0.7rem 0 0;
+}
+
+.support-button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 700;
+  min-height: 2.7rem;
+  padding: 0.6rem 0.85rem;
+}
+
+.vault-main {
+  min-width: 0;
+}
+
+.vault-topbar {
+  align-items: center;
+  background:
+    radial-gradient(circle at 35% 0%, rgba(13, 148, 136, 0.18), transparent 30%),
+    linear-gradient(90deg, #06111d 0%, #071624 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  min-height: 5.75rem;
+  padding: 1.15rem clamp(1rem, 3vw, 2rem);
+}
+
+.page-heading {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.page-heading h1 {
+  color: #ffffff;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.65rem, 3vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.page-heading p {
+  color: #c7d4e6;
+  font-size: 0.95rem;
+  margin: 0.35rem 0 0;
+}
+
+.vault-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.vault-action-button {
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 800;
+  min-height: 2.65rem;
+  padding: 0.6rem 0.95rem;
+}
+
+.refresh-action {
+  background: linear-gradient(135deg, #069a74, #008966);
+  box-shadow: 0 10px 20px rgba(0, 137, 102, 0.25);
+}
+
+.logout-action {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.vault-action-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.vault-content {
+  padding: clamp(1rem, 2.4vw, 1.6rem);
+}
+
+.dashboard-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.vault-card,
+.vault-panel {
+  background: #ffffff;
+  border: 1px solid #dfe6ee;
+  border-radius: 8px;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+.status-card-grid,
+.portfolio-metric-grid,
+.summary-grid,
+.analytics-payment-cards {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.status-card-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.status-card,
+.metric-card {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  min-height: 7rem;
+  padding: 1rem 1.15rem;
+}
+
+.status-card strong {
+  color: #16243a;
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.metric-icon {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 3.3rem;
+  justify-content: center;
+  width: 3.3rem;
+}
+
+.metric-icon-green {
+  background: #dcf6ec;
+  color: #087c5a;
+}
+
+.metric-icon-blue {
+  background: #e4f0ff;
+  color: #0b6fe8;
+}
+
+.metric-icon-orange {
+  background: #fff0d8;
+  color: #f59a00;
+}
+
+.metric-icon-purple {
+  background: #eee7ff;
+  color: #7254d9;
+}
+
+.metric-icon-red {
+  background: #ffe6e6;
+  color: #e33a3a;
+}
+
+.status-pill {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.74rem;
+  font-weight: 800;
+  margin-top: 0.45rem;
+  padding: 0.25rem 0.55rem;
+}
+
+.status-pill-green {
+  background: #dcf6ec;
+  color: #087c5a;
+}
+
+.status-pill-blue {
+  background: #e4f0ff;
+  color: #0b6fe8;
+}
+
+.status-pill-orange {
+  background: #fff0d8;
+  color: #a35b00;
+}
+
+.status-pill-purple {
+  background: #eee7ff;
+  color: #5c43b6;
+}
+
+.vault-panel {
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.25rem);
+}
+
+.vault-panel-header {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.vault-panel-header h2,
+.portfolio-insight-header h2,
+.income-calendar-header h2,
+.projection-header h2 {
+  color: #17243a;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.dashboard-page-grid {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.two-column-grid {
+  grid-template-columns: minmax(18rem, 0.95fr) minmax(0, 1.05fr);
+}
+
+.vault-toolbar {
+  flex-wrap: wrap;
+}
+
+.vault-search-input {
+  background: #ffffff;
+  border: 1px solid #d7e0eb;
+  border-radius: 8px;
+  color: #17243a;
+  min-height: 2.45rem;
+  min-width: min(100%, 20rem);
+  padding: 0.45rem 0.8rem;
+}
+
+.vault-search-input:focus {
+  border-color: #0f8b6c;
+  box-shadow: 0 0 0 3px rgba(15, 139, 108, 0.14);
+  outline: 0;
+}
+
+.summary-card {
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+.summary-value {
+  color: #07111f;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.positive-metric {
+  color: #087c5a !important;
+}
+
+.negative-metric {
+  color: #d92d20 !important;
+}
+
+.portfolio-insight-grid {
+  margin-top: 1rem;
+}
+
+.portfolio-insight-panel,
+.projection-card,
+.income-calendar-card {
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+.holdings-table-wrap,
+.projection-table-wrap {
+  border-color: #dfe6ee;
+}
+
+.holdings-table th,
+.projection-table th {
+  background: #f7f9fc;
+  color: #516176;
+}
+
+.holdings-table th button {
+  color: inherit;
+}
+
+.dividend-panel-header {
+  align-items: flex-start;
+}
+
+.dividend-controls .form-check-label {
+  color: #24364b;
+  font-weight: 700;
+}
+
+.analytics-payment-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.vault-login-page {
+  align-items: stretch;
+  background: #f7f8fb;
+  display: grid;
+  grid-template-columns: minmax(22rem, 0.92fr) minmax(24rem, 1.08fr);
+  justify-content: stretch;
+  min-height: 100vh;
+  padding: 0;
+}
+
+.login-story-panel {
+  background:
+    linear-gradient(180deg, rgba(2, 14, 25, 0.42), rgba(2, 14, 25, 0.92)),
+    radial-gradient(circle at 80% 40%, rgba(20, 184, 166, 0.25), transparent 26%),
+    linear-gradient(135deg, #05101c 0%, #071827 100%);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(2rem, 8vh, 5.5rem);
+  overflow: hidden;
+  padding: clamp(2rem, 5vw, 4rem);
+  position: relative;
+}
+
+.login-story-panel::after {
+  background:
+    linear-gradient(90deg, transparent, rgba(32, 201, 151, 0.16), transparent),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 22px);
+  bottom: -8rem;
+  content: "";
+  height: 22rem;
+  left: -3rem;
+  opacity: 0.36;
+  position: absolute;
+  right: -3rem;
+  transform: skewY(-10deg);
+}
+
+.login-story-copy {
+  max-width: 38rem;
+  position: relative;
+  z-index: 1;
+}
+
+.login-story-copy h1 {
+  color: #ffffff;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.6rem, 5vw, 4.3rem);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.08;
+  margin: 0 0 clamp(2rem, 6vh, 4rem);
+}
+
+.login-story-copy h1 span {
+  color: #05a983;
+}
+
+.login-benefits {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.login-benefits article {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 4rem minmax(0, 1fr);
+}
+
+.login-benefits article > span {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  color: #10b98d;
+  display: inline-flex;
+  height: 3.75rem;
+  justify-content: center;
+  width: 3.75rem;
+}
+
+.login-benefits strong {
+  color: #ffffff;
+  display: block;
+  font-size: 1.05rem;
+}
+
+.login-benefits p {
+  color: #c9d4e2;
+  margin: 0.35rem 0 0;
+}
+
+.login-form-panel {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  padding: clamp(1.25rem, 4vw, 4rem);
+}
+
+.vault-login-card {
+  border: 1px solid #dfe6ee;
+  border-radius: 8px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
+  max-width: 43rem;
+  width: 100%;
+}
+
+.vault-login-card .card-body {
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.login-card-brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.vault-login-card .login-header {
+  text-align: center;
+}
+
+.vault-login-card .login-header h1 {
+  color: #07111f;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.2rem, 4vw, 3rem);
+}
+
+.vault-form-group {
+  margin-bottom: 1.15rem;
+}
+
+.vault-form-group .form-label {
+  color: #132033;
+  font-weight: 800;
+}
+
+.vault-input-shell {
+  align-items: center;
+  border: 1px solid #cad4e1;
+  border-radius: 8px;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0 0.85rem;
+}
+
+.vault-input-shell svg {
+  color: #64748b;
+  flex: 0 0 auto;
+}
+
+.vault-input-shell .form-control {
+  border: 0;
+  box-shadow: none;
+  min-height: 3.25rem;
+  padding-left: 0;
+}
+
+.vault-input-shell:focus-within {
+  border-color: #0f8b6c;
+  box-shadow: 0 0 0 3px rgba(15, 139, 108, 0.14);
+}
+
+.login-submit {
+  background: linear-gradient(135deg, #0b946f, #008966);
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  min-height: 3.25rem;
+  width: 100%;
+}
+
+.login-verification-note,
+.login-security-note {
+  color: #5f6d7e;
+  margin: 0.85rem 0 0;
+  text-align: center;
+}
+
+.login-security-note {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  justify-content: center;
+}
+
+.login-security-note svg {
+  color: #0f8b6c;
+}
+
+@media (max-width: 1180px) {
+  .status-card-grid,
+  .portfolio-metric-grid,
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .two-column-grid,
+  .portfolio-insight-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .vault-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .vault-sidebar {
+    min-height: auto;
+    padding: 1rem;
+  }
+
+  .vault-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .vault-nav-button {
+    justify-content: center;
+  }
+
+  .market-snapshot,
+  .support-button {
+    display: none;
+  }
+
+  .vault-topbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .vault-actions {
+    width: 100%;
+  }
+
+  .vault-actions button {
+    justify-content: center;
+  }
+
+  .vault-login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-story-panel {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .vault-content {
+    padding: 1rem;
+  }
+
+  .vault-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page-heading {
+    align-items: flex-start;
+  }
+
+  .vault-actions,
+  .dividend-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vault-action-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .status-card-grid,
+  .portfolio-metric-grid,
+  .summary-grid,
+  .analytics-payment-cards,
+  .income-calendar-summary,
+  .income-month-grid,
+  .performance-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .login-story-copy h1 {
+    font-size: 2.45rem;
+  }
+
+  .login-benefits article {
+    grid-template-columns: 1fr;
+  }
+}

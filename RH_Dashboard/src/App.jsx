@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Col, Container, Form, Row } from "react-bootstrap";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Form } from "react-bootstrap";
+import {
+  Building2,
+  CalendarDays,
+  CircleDollarSign,
+  Landmark,
+  TrendingUp,
+  WalletCards,
+} from "lucide-react";
 import HoldingsPieChart, { HoldingsTable } from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
 import PortfolioSummary from "./Components/PortfolioSummary";
@@ -7,6 +15,9 @@ import PortfolioOverview from "./Components/PortfolioOverview";
 import IncomeProjection from "./Components/IncomeProjection";
 import IncomeCalendar from "./Components/IncomeCalendar";
 import LoginPage from "./Components/LoginPage";
+import AppShell from "./Components/Shell/AppShell";
+import MetricCard from "./Components/Shell/MetricCard";
+import StatusCards from "./Components/Shell/StatusCards";
 import { fetchJson, postJson } from "./api";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
@@ -32,12 +43,34 @@ const createDashboardIdleState = () => ({
 });
 
 const DASHBOARD_PREFERENCES_KEY = "rh-dashboard:preferences";
-const DASHBOARD_TABS = ["portfolio", "dividends"];
+const DASHBOARD_VIEWS = ["overview", "portfolio", "dividends", "holdings", "analytics"];
 const CHART_TYPES = ["Bar Plot", "Scatter Plot", "Line Graph"];
+const PAGE_COPY = {
+  overview: {
+    title: "Portfolio Dashboard",
+    subtitle: "Track allocation, performance, and dividend income",
+  },
+  portfolio: {
+    title: "Portfolio",
+    subtitle: "Monitor holdings, allocation, and performance",
+  },
+  dividends: {
+    title: "Dividends",
+    subtitle: "Track dividend income, trends, and performance",
+  },
+  holdings: {
+    title: "Holdings",
+    subtitle: "Review individual positions, weights, and cost basis",
+  },
+  analytics: {
+    title: "Dividend Income Outlook",
+    subtitle: "Forecast dividend payments and compare yearly income",
+  },
+};
 
 const getStoredDashboardPreferences = (currentYear) => {
   const defaults = {
-    activeTab: "portfolio",
+    activeView: "overview",
     selectedYear: currentYear,
     chartType: "Bar Plot",
     comparePreviousYear: false,
@@ -48,11 +81,12 @@ const getStoredDashboardPreferences = (currentYear) => {
       window.localStorage.getItem(DASHBOARD_PREFERENCES_KEY) || "{}"
     );
     const selectedYear = Number(storedPreferences.selectedYear);
+    const storedView = storedPreferences.activeView || storedPreferences.activeTab;
 
     return {
-      activeTab: DASHBOARD_TABS.includes(storedPreferences.activeTab)
-        ? storedPreferences.activeTab
-        : defaults.activeTab,
+      activeView: DASHBOARD_VIEWS.includes(storedView)
+        ? storedView
+        : defaults.activeView,
       selectedYear:
         Number.isInteger(selectedYear) &&
         selectedYear <= currentYear &&
@@ -67,6 +101,32 @@ const getStoredDashboardPreferences = (currentYear) => {
   } catch {
     return defaults;
   }
+};
+
+const hasValue = (value) => value !== null && value !== undefined;
+
+const formatCurrency = (value) =>
+  hasValue(value) ? `$${Number(value).toFixed(2)}` : "Unavailable";
+
+const formatSignedCurrency = (value) => {
+  if (!hasValue(value)) {
+    return "Unavailable";
+  }
+
+  const amount = Number(value);
+  const prefix = amount > 0 ? "+" : amount < 0 ? "-" : "";
+  return `${prefix}$${Math.abs(amount).toFixed(2)}`;
+};
+
+const formatPercent = (value) =>
+  hasValue(value) ? `${Number(value).toFixed(2)}%` : "Unavailable";
+
+const getToneClass = (value) => {
+  if (!hasValue(value) || Number(value) === 0) {
+    return "";
+  }
+
+  return Number(value) > 0 ? "positive-metric" : "negative-metric";
 };
 
 const formatGeneratedAt = (generatedAt) => {
@@ -123,6 +183,24 @@ const getSourceNotes = (dataSources) => {
   return notes;
 };
 
+const filterHoldingsBySearch = (holdings, searchQuery) => {
+  const query = searchQuery.trim().toLowerCase();
+
+  if (!query || !holdings) {
+    return holdings;
+  }
+
+  return Object.fromEntries(
+    Object.entries(holdings).filter(([ticker, details]) => {
+      const name = details?.name || "";
+      return (
+        ticker.toLowerCase().includes(query) ||
+        name.toLowerCase().includes(query)
+      );
+    })
+  );
+};
+
 function App() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 6 }, (_, index) => currentYear - index);
@@ -133,11 +211,12 @@ function App() {
   const [authError, setAuthError] = useState(null);
   const [authMfaRequired, setAuthMfaRequired] = useState(false);
   const [chartType, setChartType] = useState(initialPreferences.chartType);
-  const [activeTab, setActiveTab] = useState(initialPreferences.activeTab);
+  const [activeView, setActiveView] = useState(initialPreferences.activeView);
   const [selectedYear, setSelectedYear] = useState(initialPreferences.selectedYear);
   const [comparePreviousYear, setComparePreviousYear] = useState(
     initialPreferences.comparePreviousYear
   );
+  const [holdingsSearch, setHoldingsSearch] = useState("");
   const [portfolioData, setPortfolioData] = useState(null);
   const [portfolioOverviewData, setPortfolioOverviewData] = useState(null);
   const [holdingsData, setHoldingsData] = useState(null);
@@ -157,13 +236,13 @@ function App() {
     window.localStorage.setItem(
       DASHBOARD_PREFERENCES_KEY,
       JSON.stringify({
-        activeTab,
+        activeView,
         selectedYear,
         chartType,
         comparePreviousYear,
       })
     );
-  }, [activeTab, chartType, comparePreviousYear, selectedYear]);
+  }, [activeView, chartType, comparePreviousYear, selectedYear]);
 
   const applyDashboardSnapshot = useCallback((data) => {
     setPortfolioData(data.portfolio);
@@ -456,6 +535,11 @@ function App() {
     };
   }, [authStatus, comparePreviousYear, handleUnauthenticatedError, selectedYear]);
 
+  const filteredHoldingsData = useMemo(
+    () => filterHoldingsBySearch(holdingsData, holdingsSearch),
+    [holdingsData, holdingsSearch]
+  );
+
   const handleLogin = async (credentials) => {
     setAuthMfaRequired(false);
 
@@ -492,6 +576,7 @@ function App() {
     setLoading(createDashboardLoadingState());
     setAuthError(null);
     setAuthMfaRequired(false);
+    setActiveView("overview");
     setAuthStatus("authenticated");
   };
 
@@ -588,15 +673,295 @@ function App() {
     : dashboardMetadata.partialDataAvailable
     ? "Partial data"
     : "Ready";
+  const generatedAt = formatGeneratedAt(dashboardMetadata?.generatedAt);
+
+  const renderStatusCards = () => (
+    <StatusCards
+      generatedAt={generatedAt}
+      dataStatus={dashboardDataStatus}
+      sourceNotes={sourceNotes}
+    />
+  );
+
+  const renderDashboardError = () =>
+    dashboardError && (
+      <div
+        className={`connection-banner ${
+          dashboardError.status === 401 ? "auth-banner" : "error-banner"
+        }`}
+        role="status"
+      >
+        <strong>
+          {dashboardError.status === 401
+            ? "Robinhood login required"
+            : "Dashboard data unavailable"}
+        </strong>
+        <span>{dashboardError.message}</span>
+      </div>
+    );
+
+  const renderWarnings = () =>
+    dashboardWarnings.length > 0 && (
+      <div className="connection-banner warning-banner" role="status">
+        <strong>Data notes</strong>
+        <ul className="dashboard-warning-list">
+          {dashboardWarnings.map((warning) => (
+            <li key={`${warning.code}-${warning.message}`}>
+              {warning.message}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+
+  const renderPortfolioMetrics = () =>
+    portfolioOverviewData && (
+      <div className="portfolio-metric-grid">
+        <MetricCard
+          icon={CircleDollarSign}
+          label="Portfolio Value"
+          value={formatCurrency(portfolioOverviewData.total_equity)}
+          tone="green"
+          footnote={`${portfolioOverviewData.position_count || 0} positions`}
+        />
+        <MetricCard
+          icon={TrendingUp}
+          label="Unrealized Gain / Loss"
+          value={formatSignedCurrency(portfolioOverviewData.unrealized_gain_loss)}
+          tone="red"
+          trend={{
+            className: getToneClass(portfolioOverviewData.unrealized_return_percent),
+            text: formatPercent(portfolioOverviewData.unrealized_return_percent),
+          }}
+          footnote="Total return"
+        />
+        <MetricCard
+          icon={WalletCards}
+          label="Estimated Annual Dividends"
+          value={formatCurrency(portfolioOverviewData.estimated_annual_dividend_income)}
+          tone="orange"
+          footnote={`${formatPercent(portfolioOverviewData.estimated_dividend_yield_percent)} dividend yield`}
+        />
+        <MetricCard
+          icon={Building2}
+          label="Largest Position"
+          value={portfolioOverviewData.largest_position?.ticker || "None"}
+          tone="blue"
+          footnote={`${formatPercent(portfolioOverviewData.largest_position_weight_percent)} of portfolio`}
+        />
+      </div>
+    );
+
+  const renderAllocationPanel = () => (
+    <section className="vault-panel">
+      <div className="vault-panel-header">
+        <h2>Portfolio Allocation</h2>
+      </div>
+      {renderPanelState(
+        "holdings",
+        holdingsData && <HoldingsPieChart data={holdingsData} />
+      )}
+    </section>
+  );
+
+  const renderHoldingsTablePanel = ({ searchable = false } = {}) => (
+    <section className="vault-panel holdings-table-panel">
+      <div className="vault-panel-header vault-toolbar">
+        <h2>Holdings Details</h2>
+        {searchable && (
+          <input
+            aria-label="Search holdings"
+            className="vault-search-input"
+            onChange={(event) => setHoldingsSearch(event.target.value)}
+            placeholder="Search by ticker or company"
+            type="search"
+            value={holdingsSearch}
+          />
+        )}
+      </div>
+      {renderPanelState(
+        "holdings",
+        (searchable ? filteredHoldingsData : holdingsData) && (
+          <HoldingsTable
+            data={searchable ? filteredHoldingsData : holdingsData}
+            searchQuery={searchable ? holdingsSearch : ""}
+            showPerformance
+          />
+        )
+      )}
+    </section>
+  );
+
+  const renderOverviewView = () => (
+    <div className="dashboard-view overview-view">
+      {renderStatusCards()}
+      {renderDashboardError()}
+      {renderPanelState(
+        "portfolioOverview",
+        portfolioOverviewData && <PortfolioOverview data={portfolioOverviewData} />
+      )}
+      {renderWarnings()}
+      {renderAllocationPanel()}
+    </div>
+  );
+
+  const renderPortfolioView = () => (
+    <div className="dashboard-view portfolio-view">
+      {renderStatusCards()}
+      {renderDashboardError()}
+      {renderPanelState("portfolioOverview", renderPortfolioMetrics())}
+      <div className="dashboard-page-grid two-column-grid">
+        {renderAllocationPanel()}
+        {renderPanelState(
+          "portfolioOverview",
+          portfolioOverviewData && <PortfolioOverview data={portfolioOverviewData} />
+        )}
+      </div>
+      {renderWarnings()}
+      {renderHoldingsTablePanel()}
+    </div>
+  );
+
+  const renderDividendsView = () => (
+    <div className="dashboard-view dividends-view">
+      {renderPanelState(
+        "portfolio",
+        portfolioData && (
+          <PortfolioSummary
+            equity={portfolioData.equity}
+            dividendsThisMonth={portfolioData.dividends_this_month}
+            dividendsThisYear={portfolioData.dividends_this_year}
+          />
+        )
+      )}
+
+      <section className="vault-panel">
+        <div className="vault-panel-header dividend-panel-header">
+          <h2>Dividend Performance</h2>
+          <div className="dividend-controls">
+            <Form.Select
+              aria-label="Dividend year"
+              className="year-select"
+              size="sm"
+              value={selectedYear}
+              onChange={handleYearChange}
+            >
+              {yearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </Form.Select>
+            <Form.Select
+              aria-label="Dividend chart type"
+              className="chart-type-select"
+              size="sm"
+              value={chartType}
+              onChange={(event) => setChartType(event.target.value)}
+            >
+              <option value="Bar Plot">Bar Plot</option>
+              <option value="Scatter Plot">Scatter Plot</option>
+              <option value="Line Graph">Line Graph</option>
+            </Form.Select>
+            <Form.Check
+              type="switch"
+              id="compare-year-switch"
+              label="Compare Previous Year"
+              checked={comparePreviousYear}
+              onChange={() => setComparePreviousYear((currentValue) => !currentValue)}
+            />
+          </div>
+        </div>
+        {errors.dividendComparison && !loading.dividendComparison && (
+          <div className="comparison-error">{errors.dividendComparison}</div>
+        )}
+        {renderPanelState(
+          "dividends",
+          yearlyDividendData && (
+            <DividendChart
+              data={yearlyDividendData}
+              comparisonData={previousYearDividendData}
+              chartType={chartType}
+              selectedYear={selectedYear}
+              comparePreviousYear={comparePreviousYear}
+              isComparisonLoading={loading.dividendComparison}
+            />
+          )
+        )}
+      </section>
+    </div>
+  );
+
+  const renderHoldingsView = () => (
+    <div className="dashboard-view holdings-view">
+      {renderStatusCards()}
+      {renderDashboardError()}
+      {renderPanelState(
+        "portfolioOverview",
+        portfolioOverviewData && <PortfolioOverview data={portfolioOverviewData} />
+      )}
+      {renderWarnings()}
+      {renderHoldingsTablePanel({ searchable: true })}
+    </div>
+  );
+
+  const renderAnalyticsView = () => (
+    <div className="dashboard-view analytics-view">
+      {renderStatusCards()}
+      <div className="analytics-payment-cards">
+        <MetricCard
+          icon={CalendarDays}
+          label="Next Expected Payment"
+          value="Modeled in calendar"
+          tone="green"
+          footnote="Received and estimated"
+        />
+        <MetricCard
+          icon={WalletCards}
+          label="Current Month Income"
+          value="See income calendar"
+          tone="blue"
+          footnote="Live from dividend model"
+        />
+        <MetricCard
+          icon={Landmark}
+          label="Remaining Estimated Annual Income"
+          value="See projection"
+          tone="orange"
+          footnote="Based on current holdings"
+        />
+      </div>
+      {renderPanelState(
+        "incomeCalendar",
+        incomeCalendarData && <IncomeCalendar data={incomeCalendarData} />
+      )}
+      {renderPanelState(
+        "incomeProjection",
+        incomeProjectionData && <IncomeProjection data={incomeProjectionData} />
+      )}
+    </div>
+  );
+
+  const renderDashboardView = () => {
+    const viewRenderers = {
+      overview: renderOverviewView,
+      portfolio: renderPortfolioView,
+      dividends: renderDividendsView,
+      holdings: renderHoldingsView,
+      analytics: renderAnalyticsView,
+    };
+
+    return (viewRenderers[activeView] || renderOverviewView)();
+  };
 
   if (authStatus === "checking") {
     return (
-      <Container fluid className="dashboard-container auth-check-container">
+      <main className="dashboard-container auth-check-container">
         <div className="auth-checking-state">
           <div className="loading-ring" aria-hidden="true" />
           <span>Checking Robinhood session...</span>
         </div>
-      </Container>
+      </main>
     );
   }
 
@@ -610,284 +975,20 @@ function App() {
     );
   }
 
+  const pageCopy = PAGE_COPY[activeView] || PAGE_COPY.overview;
+
   return (
-    <Container fluid className="dashboard-container">
-      <Row className="justify-content-center dashboard-header">
-        <Col md={12}>
-          <div className="dashboard-header-content">
-            <div className="dashboard-title-block">
-              <h1 className="dashboard-title">Portfolio Dashboard</h1>
-              <p className="dashboard-subtitle">
-                Track allocation, performance, and dividend income
-              </p>
-            </div>
-            <div className="dashboard-header-actions">
-              <Button
-                className="refresh-button"
-                disabled={isDashboardBusy}
-                onClick={handleRefreshDashboard}
-                size="sm"
-                type="button"
-                variant="primary"
-              >
-                {isDashboardBusy ? "Refreshing" : "Refresh"}
-              </Button>
-              <Button
-                className="logout-button"
-                onClick={handleLogout}
-                size="sm"
-                type="button"
-                variant="outline-secondary"
-              >
-                Logout
-              </Button>
-            </div>
-          </div>
-        </Col>
-      </Row>
-
-      <Row className="dashboard-status-row">
-        <Col md={12}>
-          <div className="dashboard-status-strip" aria-label="Dashboard status">
-            <div className="dashboard-status-item">
-              <span className="metric-kicker">Session</span>
-              <strong>Robinhood connected</strong>
-            </div>
-            <div className="dashboard-status-item">
-              <span className="metric-kicker">Last Updated</span>
-              <strong>{formatGeneratedAt(dashboardMetadata?.generatedAt)}</strong>
-            </div>
-            <div className="dashboard-status-item">
-              <span className="metric-kicker">Data Status</span>
-              <strong>{dashboardDataStatus}</strong>
-            </div>
-            <div className="dashboard-status-item dashboard-source-item">
-              <span className="metric-kicker">Sources</span>
-              <strong>{sourceNotes.join(" / ")}</strong>
-            </div>
-          </div>
-        </Col>
-      </Row>
-
-      <Row className="dashboard-tabs-row">
-        <Col md={12}>
-          <div className="dashboard-tabs" role="tablist" aria-label="Dashboard views">
-            <button
-              aria-controls="portfolio-panel"
-              aria-selected={activeTab === "portfolio"}
-              className={`dashboard-tab ${activeTab === "portfolio" ? "active" : ""}`}
-              id="portfolio-tab"
-              onClick={() => setActiveTab("portfolio")}
-              role="tab"
-              type="button"
-            >
-              Portfolio
-            </button>
-            <button
-              aria-controls="dividends-panel"
-              aria-selected={activeTab === "dividends"}
-              className={`dashboard-tab ${activeTab === "dividends" ? "active" : ""}`}
-              id="dividends-tab"
-              onClick={() => setActiveTab("dividends")}
-              role="tab"
-              type="button"
-            >
-              Dividends
-            </button>
-          </div>
-        </Col>
-      </Row>
-
-      {dashboardError && (
-        <Row className="dashboard-status-row">
-          <Col md={12}>
-            <div
-              className={`connection-banner ${
-                dashboardError.status === 401 ? "auth-banner" : "error-banner"
-              }`}
-              role="status"
-            >
-              <strong>
-                {dashboardError.status === 401
-                  ? "Robinhood login required"
-                  : "Dashboard data unavailable"}
-              </strong>
-              <span>{dashboardError.message}</span>
-            </div>
-          </Col>
-        </Row>
-      )}
-
-      {dashboardWarnings.length > 0 && (
-        <Row className="dashboard-status-row">
-          <Col md={12}>
-            <div className="connection-banner warning-banner" role="status">
-              <strong>Data notes</strong>
-              <ul className="dashboard-warning-list">
-                {dashboardWarnings.map((warning) => (
-                  <li key={`${warning.code}-${warning.message}`}>
-                    {warning.message}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Col>
-        </Row>
-      )}
-
-      <section
-        aria-labelledby="portfolio-tab"
-        className="dashboard-tab-panel"
-        hidden={activeTab !== "portfolio"}
-        id="portfolio-panel"
-        role="tabpanel"
-      >
-        <Row className="dashboard-overview-row">
-          <Col md={12}>
-            {renderPanelState(
-              "portfolioOverview",
-              portfolioOverviewData && <PortfolioOverview data={portfolioOverviewData} />
-            )}
-          </Col>
-        </Row>
-
-        <Row className="dashboard-main-row">
-          <Col lg={5} className="mb-4">
-            <Card className="h-100 chart-card">
-              <Card.Body>
-                <Card.Title className="chart-title">Portfolio Allocation</Card.Title>
-                {renderPanelState(
-                  "holdings",
-                  holdingsData && <HoldingsPieChart data={holdingsData} />
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-
-          <Col lg={7} className="mb-4">
-            <Card className="h-100 chart-card holdings-table-card">
-              <Card.Body>
-                <Card.Title className="chart-title">Holdings Details</Card.Title>
-                {renderPanelState(
-                  "holdings",
-                  holdingsData && <HoldingsTable data={holdingsData} showPerformance />
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </section>
-
-      <section
-        aria-labelledby="dividends-tab"
-        className="dashboard-tab-panel"
-        hidden={activeTab !== "dividends"}
-        id="dividends-panel"
-        role="tabpanel"
-      >
-        <Row className="dashboard-summary-row">
-          <Col md={12}>
-            {renderPanelState(
-              "portfolio",
-              portfolioData && (
-                <PortfolioSummary
-                  equity={portfolioData.equity}
-                  dividendsThisMonth={portfolioData.dividends_this_month}
-                  dividendsThisYear={portfolioData.dividends_this_year}
-                />
-              )
-            )}
-          </Col>
-        </Row>
-
-        <Row className="dashboard-main-row">
-          <Col md={12} className="mb-4">
-            <Card className="chart-card">
-              <Card.Body>
-                <div className="chart-card-header">
-                  <Card.Title className="chart-title mb-0">Dividend Performance</Card.Title>
-                  <div className="dividend-controls">
-                    <Form.Select
-                      aria-label="Dividend year"
-                      className="year-select"
-                      size="sm"
-                      value={selectedYear}
-                      onChange={handleYearChange}
-                    >
-                      {yearOptions.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </Form.Select>
-                    <Form.Select
-                      aria-label="Dividend chart type"
-                      className="chart-type-select"
-                      size="sm"
-                      value={chartType}
-                      onChange={(event) => setChartType(event.target.value)}
-                    >
-                      <option value="Bar Plot">Bar Plot</option>
-                      <option value="Scatter Plot">Scatter Plot</option>
-                      <option value="Line Graph">Line Graph</option>
-                    </Form.Select>
-                    <Form.Check
-                      type="switch"
-                      id="compare-year-switch"
-                      label={`Compare ${selectedYear - 1}`}
-                      checked={comparePreviousYear}
-                      onChange={() => setComparePreviousYear((currentValue) => !currentValue)}
-                    />
-                  </div>
-                </div>
-                {errors.dividendComparison && !loading.dividendComparison && (
-                  <div className="comparison-error">{errors.dividendComparison}</div>
-                )}
-                {renderPanelState(
-                  "dividends",
-                  yearlyDividendData && (
-                    <DividendChart
-                      data={yearlyDividendData}
-                      comparisonData={previousYearDividendData}
-                      chartType={chartType}
-                      selectedYear={selectedYear}
-                      comparePreviousYear={comparePreviousYear}
-                      isComparisonLoading={loading.dividendComparison}
-                    />
-                  )
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-
-        <Row className="dashboard-calendar-row">
-          <Col md={12}>
-            {renderPanelState(
-              "incomeCalendar",
-              incomeCalendarData && (
-                <IncomeCalendar
-                  data={incomeCalendarData}
-                />
-              )
-            )}
-          </Col>
-        </Row>
-
-        <Row className="dashboard-projection-row">
-          <Col md={12}>
-            {renderPanelState(
-              "incomeProjection",
-              incomeProjectionData && (
-                <IncomeProjection
-                  data={incomeProjectionData}
-                />
-              )
-            )}
-          </Col>
-        </Row>
-      </section>
-    </Container>
+    <AppShell
+      activeView={activeView}
+      isBusy={isDashboardBusy}
+      onLogout={handleLogout}
+      onNavigate={setActiveView}
+      onRefresh={handleRefreshDashboard}
+      pageSubtitle={pageCopy.subtitle}
+      pageTitle={pageCopy.title}
+    >
+      {renderDashboardView()}
+    </AppShell>
   );
 }
 

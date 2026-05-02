@@ -9,9 +9,9 @@ describe("LoginPage", () => {
 
     render(<LoginPage onLogin={onLogin} />);
 
-    await user.type(screen.getByLabelText(/username/i), "user@example.com");
+    await user.type(screen.getByLabelText(/email or username/i), "user@example.com");
     await user.type(screen.getByLabelText(/password/i), "secret-password");
-    await user.click(screen.getByRole("button", { name: /log in/i }));
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(onLogin).toHaveBeenCalledWith({
       username: "user@example.com",
@@ -28,9 +28,9 @@ describe("LoginPage", () => {
 
     render(<LoginPage onLogin={onLogin} />);
 
-    await user.type(screen.getByLabelText(/username/i), "user@example.com");
+    await user.type(screen.getByLabelText(/email or username/i), "user@example.com");
     await user.type(screen.getByLabelText(/password/i), "secret-password");
-    await user.click(screen.getByRole("button", { name: /log in/i }));
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(
       await screen.findByText(/Robinhood needs phone approval/i)
@@ -47,9 +47,9 @@ describe("LoginPage", () => {
 
     render(<LoginPage onLogin={onLogin} />);
 
-    await user.type(screen.getByLabelText(/username/i), "user@example.com");
+    await user.type(screen.getByLabelText(/email or username/i), "user@example.com");
     await user.type(screen.getByLabelText(/password/i), "secret-password");
-    await user.click(screen.getByRole("button", { name: /log in/i }));
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     expect(
       await screen.findByText(/Robinhood requires an MFA code/i)

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "bootstrap": "5.3.5",
+    "lucide-react": "^1.14.0",
     "react": "19.1.0",
     "react-bootstrap": "2.10.9",
     "react-dom": "19.1.0",
