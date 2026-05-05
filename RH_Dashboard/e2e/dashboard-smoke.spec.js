@@ -115,6 +115,16 @@ test.describe("Dividend Vault browser smoke", () => {
       "aria-current",
       "page"
     );
+
+    const analyticsCards = page.locator(".analytics-payment-cards");
+    await expect(analyticsCards).toContainText("$86.70");
+    await expect(analyticsCards).toContainText("SCHD on Jun 24");
+    await expect(analyticsCards).toContainText("$28.44");
+    await expect(analyticsCards).toContainText("$471.73");
+    await expect(page.getByText("Modeled in calendar")).toHaveCount(0);
+    await expect(page.getByText("See income calendar")).toHaveCount(0);
+    await expect(page.getByText("See projection")).toHaveCount(0);
+    await expect(page.locator(".income-calendar-summary")).toHaveCount(0);
   });
 
   test("filters holdings by company name", async ({ page }) => {

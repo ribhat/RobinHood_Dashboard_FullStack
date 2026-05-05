@@ -31,42 +31,6 @@ const sortPaymentsByStatusAndAmount = (a, b) => {
   );
 };
 
-const getNextExpectedPaymentGroup = (months) => {
-  const expectedPayments = months
-    .flatMap((month) => month.items || [])
-    .filter((item) => item.status !== "received" && item.date)
-    .sort((a, b) => {
-      const dateDifference = `${a.date}`.localeCompare(`${b.date}`);
-
-      if (dateDifference !== 0) {
-        return dateDifference;
-      }
-
-      return Number(b.amount || 0) - Number(a.amount || 0);
-    });
-
-  if (expectedPayments.length === 0) {
-    return null;
-  }
-
-  const nextDate = expectedPayments[0].date;
-  const paymentsOnNextDate = expectedPayments.filter((item) => item.date === nextDate);
-  const amount = paymentsOnNextDate.reduce(
-    (total, item) => total + Number(item.amount || 0),
-    0
-  );
-  const tickers = paymentsOnNextDate
-    .map((item) => item.ticker)
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-
-  return {
-    amount,
-    date: nextDate,
-    tickers,
-  };
-};
-
 const IncomeCalendar = ({ data }) => {
   const sortedMonths = useMemo(
     () =>
@@ -76,15 +40,6 @@ const IncomeCalendar = ({ data }) => {
       })),
     [data?.months]
   );
-  const summary = data?.summary || {};
-  const nextPayment = useMemo(
-    () => getNextExpectedPaymentGroup(sortedMonths),
-    [sortedMonths]
-  );
-  const asOfDate = data?.as_of_date ? new Date(`${data.as_of_date}T00:00:00`) : new Date();
-  const currentMonth = String(asOfDate.getMonth() + 1).padStart(2, "0");
-  const currentMonthBucket = sortedMonths.find((month) => month.month === currentMonth);
-  const currentMonthLabel = currentMonthBucket?.month_name || "Current Month";
 
   if (sortedMonths.length === 0) {
     return (
@@ -104,40 +59,6 @@ const IncomeCalendar = ({ data }) => {
           <h2>{data?.year} Dividend Payments</h2>
         </div>
         <span className="projection-basis">Received + estimated cash flow</span>
-      </div>
-
-      <div className="income-calendar-summary">
-        <div className="income-summary-tile">
-          <span className="summary-label">Next Expected Payment</span>
-          {nextPayment ? (
-            <>
-              <strong>{formatCurrency(nextPayment.amount)}</strong>
-              <span>
-                {nextPayment.tickers.join(", ")} on {formatDate(nextPayment.date)}
-              </span>
-            </>
-          ) : (
-            <>
-              <strong>{formatCurrency(0)}</strong>
-              <span>None scheduled</span>
-            </>
-          )}
-        </div>
-        <div className="income-summary-tile">
-          <span className="summary-label">{currentMonthLabel} Income</span>
-          <strong>{formatCurrency(summary.current_month_income)}</strong>
-          <span>
-            {formatCurrency(summary.current_month_received)} received /{" "}
-            {formatCurrency(summary.current_month_estimated)} estimated remaining
-          </span>
-        </div>
-        <div className="income-summary-tile">
-          <span className="summary-label">Remaining Estimated Annual Income</span>
-          <strong>{formatCurrency(summary.remaining_estimated_annual_income)}</strong>
-          <span>
-            {formatCurrency(summary.total_projected_annual_income)} projected total
-          </span>
-        </div>
       </div>
 
       <div className="income-month-grid">

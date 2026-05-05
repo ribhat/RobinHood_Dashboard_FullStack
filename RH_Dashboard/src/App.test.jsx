@@ -110,8 +110,43 @@ const buildDashboardResponse = (year = new Date().getFullYear()) => ({
   },
   income_calendar: {
     year,
-    months: [],
-    summary: {},
+    as_of_date: `${year}-05-04`,
+    months: [
+      {
+        month: "05",
+        month_name: "May",
+        total: 20.63,
+        received: 0.9,
+        estimated: 19.73,
+        items: [
+          {
+            ticker: "SCHD",
+            date: `${year}-05-01`,
+            amount: 0.9,
+            status: "received",
+          },
+          {
+            ticker: "JEPI",
+            date: `${year}-05-05`,
+            amount: 5.25,
+            status: "estimated",
+          },
+          {
+            ticker: "JEPQ",
+            date: `${year}-05-05`,
+            amount: 5.26,
+            status: "estimated",
+          },
+        ],
+      },
+    ],
+    summary: {
+      current_month_income: 20.63,
+      current_month_received: 0.9,
+      current_month_estimated: 19.73,
+      remaining_estimated_annual_income: 227.71,
+      total_projected_annual_income: 334.71,
+    },
   },
   selected_year: year,
   generated_at: `${year}-04-28T19:30:00+00:00`,
@@ -231,6 +266,32 @@ describe("App", () => {
 
     expect(screen.getByTestId("holdings-table")).toHaveTextContent("SCHD");
     expect(screen.getByTestId("holdings-table")).not.toHaveTextContent("MSFT");
+  });
+
+  it("shows income calendar summary values in the analytics top cards", async () => {
+    const user = userEvent.setup();
+    mockAuthenticatedDashboard();
+
+    render(<App />);
+
+    await screen.findByText("Robinhood connected");
+    await user.click(screen.getByRole("button", { name: "Analytics" }));
+
+    expect(screen.getByRole("heading", { name: "Dividend Income Outlook" })).toBeInTheDocument();
+    expect(screen.getByText("Next Expected Payment")).toBeInTheDocument();
+    expect(screen.getByText("$10.51")).toBeInTheDocument();
+    expect(screen.getByText("JEPI, JEPQ on May 5")).toBeInTheDocument();
+    expect(screen.getByText("Current Month Income")).toBeInTheDocument();
+    expect(screen.getByText("$20.63")).toBeInTheDocument();
+    expect(
+      screen.getByText("$0.90 received / $19.73 estimated remaining")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Remaining Estimated Annual Income")).toBeInTheDocument();
+    expect(screen.getByText("$227.71")).toBeInTheDocument();
+    expect(screen.getByText("$334.71 projected total")).toBeInTheDocument();
+    expect(screen.queryByText("Modeled in calendar")).not.toBeInTheDocument();
+    expect(screen.queryByText("See income calendar")).not.toBeInTheDocument();
+    expect(screen.queryByText("See projection")).not.toBeInTheDocument();
   });
 
   it("refreshes the dashboard snapshot on demand", async () => {

@@ -721,39 +721,6 @@
   white-space: normal;
 }
 
-.income-calendar-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.85rem;
-  margin-bottom: 1rem;
-}
-
-.income-summary-tile {
-  background: #f8fafc;
-  border: 1px solid #e5eaf1;
-  border-radius: 8px;
-  min-height: 112px;
-  padding: 1rem;
-}
-
-.income-summary-tile strong {
-  color: #18283a;
-  display: block;
-  font-size: clamp(1.25rem, 2vw, 1.75rem);
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
-}
-
-.income-summary-tile span:last-child {
-  color: #667085;
-  display: block;
-  font-size: 0.86rem;
-  font-weight: 600;
-  margin-top: 0.55rem;
-}
-
 .income-month-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1370,7 +1337,6 @@
     grid-template-columns: 1fr;
   }
 
-  .income-calendar-summary,
   .income-month-grid,
   .portfolio-metric-grid,
   .portfolio-insight-grid,
@@ -2243,7 +2209,6 @@
   .portfolio-metric-grid,
   .summary-grid,
   .analytics-payment-cards,
-  .income-calendar-summary,
   .income-month-grid,
   .performance-columns {
     grid-template-columns: 1fr;

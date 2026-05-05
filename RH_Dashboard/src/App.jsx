@@ -148,6 +148,89 @@ const formatGeneratedAt = (generatedAt) => {
   }).format(generatedDate);
 };
 
+const formatShortDate = (dateText) =>
+  new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(`${dateText}T00:00:00`));
+
+const getNextExpectedPaymentGroup = (months = []) => {
+  const expectedPayments = months
+    .flatMap((month) => month.items || [])
+    .filter((item) => item.status !== "received" && item.date)
+    .sort((a, b) => {
+      const dateDifference = `${a.date}`.localeCompare(`${b.date}`);
+
+      if (dateDifference !== 0) {
+        return dateDifference;
+      }
+
+      return Number(b.amount || 0) - Number(a.amount || 0);
+    });
+
+  if (expectedPayments.length === 0) {
+    return null;
+  }
+
+  const nextDate = expectedPayments[0].date;
+  const paymentsOnNextDate = expectedPayments.filter((item) => item.date === nextDate);
+  const amount = paymentsOnNextDate.reduce(
+    (total, item) => total + Number(item.amount || 0),
+    0
+  );
+  const tickers = paymentsOnNextDate
+    .map((item) => item.ticker)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
+  return {
+    amount,
+    date: nextDate,
+    tickers,
+  };
+};
+
+const getIncomeSummaryMetrics = (incomeCalendarData) => {
+  if (!incomeCalendarData) {
+    return {
+      nextPayment: {
+        value: "Loading...",
+        footnote: "Received and estimated",
+      },
+      currentMonth: {
+        value: "Loading...",
+        footnote: "Live from dividend model",
+      },
+      remainingAnnualIncome: {
+        value: "Loading...",
+        footnote: "Based on current holdings",
+      },
+    };
+  }
+
+  const summary = incomeCalendarData.summary || {};
+  const nextPayment = getNextExpectedPaymentGroup(incomeCalendarData.months || []);
+
+  return {
+    nextPayment: {
+      value: nextPayment ? formatCurrency(nextPayment.amount) : "$0.00",
+      footnote: nextPayment
+        ? `${nextPayment.tickers.join(", ")} on ${formatShortDate(nextPayment.date)}`
+        : "None scheduled",
+    },
+    currentMonth: {
+      value: formatCurrency(summary.current_month_income ?? 0),
+      footnote: `${formatCurrency(summary.current_month_received ?? 0)} received / ${formatCurrency(
+        summary.current_month_estimated ?? 0
+      )} estimated remaining`,
+    },
+    remainingAnnualIncome: {
+      value: formatCurrency(summary.remaining_estimated_annual_income ?? 0),
+      footnote: `${formatCurrency(summary.total_projected_annual_income ?? 0)} projected total`,
+    },
+  };
+};
+
 const getPanelEmptyStateMessage = (section) => {
   const messages = {
     portfolio: "Portfolio metrics will appear after the dashboard refresh completes.",
@@ -905,42 +988,46 @@ function App() {
     </div>
   );
 
-  const renderAnalyticsView = () => (
-    <div className="dashboard-view analytics-view">
-      {renderStatusCards()}
-      <div className="analytics-payment-cards">
-        <MetricCard
-          icon={CalendarDays}
-          label="Next Expected Payment"
-          value="Modeled in calendar"
-          tone="green"
-          footnote="Received and estimated"
-        />
-        <MetricCard
-          icon={WalletCards}
-          label="Current Month Income"
-          value="See income calendar"
-          tone="blue"
-          footnote="Live from dividend model"
-        />
-        <MetricCard
-          icon={Landmark}
-          label="Remaining Estimated Annual Income"
-          value="See projection"
-          tone="orange"
-          footnote="Based on current holdings"
-        />
+  const renderAnalyticsView = () => {
+    const incomeSummaryMetrics = getIncomeSummaryMetrics(incomeCalendarData);
+
+    return (
+      <div className="dashboard-view analytics-view">
+        {renderStatusCards()}
+        <div className="analytics-payment-cards">
+          <MetricCard
+            icon={CalendarDays}
+            label="Next Expected Payment"
+            value={incomeSummaryMetrics.nextPayment.value}
+            tone="green"
+            footnote={incomeSummaryMetrics.nextPayment.footnote}
+          />
+          <MetricCard
+            icon={WalletCards}
+            label="Current Month Income"
+            value={incomeSummaryMetrics.currentMonth.value}
+            tone="blue"
+            footnote={incomeSummaryMetrics.currentMonth.footnote}
+          />
+          <MetricCard
+            icon={Landmark}
+            label="Remaining Estimated Annual Income"
+            value={incomeSummaryMetrics.remainingAnnualIncome.value}
+            tone="orange"
+            footnote={incomeSummaryMetrics.remainingAnnualIncome.footnote}
+          />
+        </div>
+        {renderPanelState(
+          "incomeCalendar",
+          incomeCalendarData && <IncomeCalendar data={incomeCalendarData} />
+        )}
+        {renderPanelState(
+          "incomeProjection",
+          incomeProjectionData && <IncomeProjection data={incomeProjectionData} />
+        )}
       </div>
-      {renderPanelState(
-        "incomeCalendar",
-        incomeCalendarData && <IncomeCalendar data={incomeCalendarData} />
-      )}
-      {renderPanelState(
-        "incomeProjection",
-        incomeProjectionData && <IncomeProjection data={incomeProjectionData} />
-      )}
-    </div>
-  );
+    );
+  };
 
   const renderDashboardView = () => {
     const viewRenderers = {
