@@ -112,6 +112,32 @@ Portfolio, holdings, and dividend data are cached briefly by the backend to redu
 
 4. Open a web browser and navigate to http://127.0.0.1:5173/ (or whichever port your computer is running the application on) to access the dashboard.
 
+## Frontend QA
+
+From the `RH_Dashboard` folder, run the fast frontend tests:
+
+```powershell
+npm run test
+```
+
+Run the browser smoke suite against mocked API responses:
+
+```powershell
+npm run test:e2e
+```
+
+Run the full local frontend QA pass:
+
+```powershell
+npm run qa
+```
+
+The first browser run on a new machine needs Chromium installed once:
+
+```powershell
+npx playwright install chromium
+```
+
 ## 🌱 Future Enhancements
 
 - Add more metrics like performance comparison to benchmark indices.

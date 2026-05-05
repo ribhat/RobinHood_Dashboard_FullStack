@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "qa": "npm run lint && npm run test && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "bootstrap": "5.3.5",
@@ -20,6 +22,7 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
+    "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
