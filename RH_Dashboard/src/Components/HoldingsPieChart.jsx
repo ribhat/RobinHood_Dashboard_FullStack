@@ -6,25 +6,9 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-
-const formatCurrency = (value) => (
-  value === null || value === undefined ? "N/A" : `$${Number(value).toFixed(2)}`
-);
-
-const formatPercent = (value) => (
-  value === null || value === undefined ? "N/A" : `${Number(value).toFixed(2)}%`
-);
-
-const getPerformanceClass = (value) => {
-  if (value === null || value === undefined || Number(value) === 0) {
-    return "";
-  }
-
-  return Number(value) > 0 ? "positive-metric" : "negative-metric";
-};
+import { formatCurrency, formatPercent, getToneClass } from "../formatters";
 
 const HoldingsPieChart = ({ data }) => {
-  // Convert data to array and sort by equity in descending order
   let chartData = Object.entries(data)
     .map(([ticker, details]) => ({
       name: ticker,
@@ -33,7 +17,6 @@ const HoldingsPieChart = ({ data }) => {
     .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value);
 
-  // Calculate total equity for all holdings
   const totalEquity = chartData.reduce((sum, item) => sum + item.value, 0);
 
   if (!chartData.length || totalEquity === 0) {
@@ -44,13 +27,11 @@ const HoldingsPieChart = ({ data }) => {
     );
   }
 
-  // If there are more than 10 holdings, keep top 10 and sum the rest as "Other"
   if (chartData.length > 10) {
     const top10 = chartData.slice(0, 10);
     const others = chartData.slice(10);
     const othersSum = others.reduce((sum, item) => sum + item.value, 0);
 
-    // Only add "Other" if the sum is greater than 0
     if (othersSum > 0) {
       chartData = [...top10, { name: "Other", value: othersSum }];
     } else {
@@ -285,11 +266,11 @@ export const HoldingsTable = ({ data, showPerformance = false, searchQuery = "" 
                 <td>${holding.averageBuyPrice.toFixed(2)}</td>
                 {showPerformance && (
                   <>
-                    <td className={getPerformanceClass(holding.unrealizedGainLoss)}>
-                      {formatCurrency(holding.unrealizedGainLoss)}
+                    <td className={getToneClass(holding.unrealizedGainLoss)}>
+                      {formatCurrency(holding.unrealizedGainLoss, "N/A")}
                     </td>
-                    <td className={getPerformanceClass(holding.unrealizedReturnPercent)}>
-                      {formatPercent(holding.unrealizedReturnPercent)}
+                    <td className={getToneClass(holding.unrealizedReturnPercent)}>
+                      {formatPercent(holding.unrealizedReturnPercent, "N/A")}
                     </td>
                   </>
                 )}

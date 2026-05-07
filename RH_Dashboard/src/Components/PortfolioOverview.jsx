@@ -1,32 +1,10 @@
 import React from "react";
-
-const hasValue = (value) => value !== null && value !== undefined;
-
-const formatCurrency = (value) => (
-  hasValue(value) ? `$${Number(value).toFixed(2)}` : "Unavailable"
-);
-
-const formatSignedCurrency = (value) => {
-  if (!hasValue(value)) {
-    return "Unavailable";
-  }
-
-  const amount = Number(value);
-  const prefix = amount > 0 ? "+" : amount < 0 ? "-" : "";
-  return `${prefix}$${Math.abs(amount).toFixed(2)}`;
-};
-
-const formatPercent = (value) => (
-  hasValue(value) ? `${Number(value).toFixed(2)}%` : "Unavailable"
-);
-
-const getToneClass = (value) => {
-  if (!hasValue(value) || Number(value) === 0) {
-    return "";
-  }
-
-  return Number(value) > 0 ? "positive-metric" : "negative-metric";
-};
+import {
+  formatCurrency,
+  formatPercent,
+  formatSignedCurrency,
+  getToneClass,
+} from "../formatters";
 
 const COST_BASIS_COVERAGE_HELP =
   "Cost basis coverage is the share of positions where purchase cost data is available. It is needed to calculate gain/loss and returns.";

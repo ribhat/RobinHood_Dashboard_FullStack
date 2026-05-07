@@ -529,12 +529,14 @@ class ApiValidationTests(unittest.TestCase):
         main.robinhood_login = None
         main.robinhood_auth_error = None
         main.robinhood_auth_requires_mfa = False
+        main.pending_robinhood_login = None
         self.client = main.app.test_client()
 
     def tearDown(self):
         main.robinhood_login = None
         main.robinhood_auth_error = None
         main.robinhood_auth_requires_mfa = False
+        main.pending_robinhood_login = None
         dashboard_data.clear_dashboard_caches()
 
     def test_health_check_does_not_require_robinhood_auth(self):
@@ -603,12 +605,14 @@ class ApiAuthTests(unittest.TestCase):
         main.robinhood_login = None
         main.robinhood_auth_error = None
         main.robinhood_auth_requires_mfa = False
+        main.pending_robinhood_login = None
         self.client = main.app.test_client()
 
     def tearDown(self):
         main.robinhood_login = None
         main.robinhood_auth_error = None
         main.robinhood_auth_requires_mfa = False
+        main.pending_robinhood_login = None
         dashboard_data.clear_dashboard_caches()
 
     @patch('main.login_to_robinhood')
@@ -666,6 +670,26 @@ class ApiAuthTests(unittest.TestCase):
             on_verification_required=ANY,
         )
         mock_clear_caches.assert_called_once()
+
+    @patch('main.login_to_robinhood')
+    def test_login_rejects_malformed_json_without_auth_attempt(self, mock_login):
+        response = self.client.post(
+            '/api/auth/login',
+            data='{bad-json',
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()['error'], 'Request body must be valid JSON.')
+        mock_login.assert_not_called()
+
+    @patch('main.login_to_robinhood')
+    def test_login_rejects_non_object_json_without_auth_attempt(self, mock_login):
+        response = self.client.post('/api/auth/login', json=['not', 'an', 'object'])
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()['error'], 'Request body must be a JSON object.')
+        mock_login.assert_not_called()
 
     @patch('main.login_to_robinhood')
     def test_login_failure_returns_401(self, mock_login):
@@ -812,6 +836,18 @@ class CorsConfigurationTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.headers.get('Access-Control-Allow-Origin'))
+
+
+class RobinhoodAuthUtilityTests(unittest.TestCase):
+    def test_logout_logs_failure_without_raising(self):
+        fake_robin = Mock()
+        fake_robin.logout.side_effect = RuntimeError('logout failed')
+
+        with patch.object(robinhood_auth, 'robin', fake_robin):
+            with self.assertLogs('robinhood_auth', level='WARNING') as logs:
+                robinhood_auth.logout_from_robinhood()
+
+        self.assertIn('Robinhood logout failed.', logs.output[0])
 
 
 class RobinhoodAuthFlowTests(unittest.TestCase):

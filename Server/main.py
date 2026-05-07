@@ -3,6 +3,7 @@ import os
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from werkzeug.exceptions import BadRequest
 from dashboard_data import (
     InvalidInputError,
     clear_dashboard_caches,
@@ -150,6 +151,24 @@ def run_robinhood_request(callback):
         return api_error(error)
 
 
+def get_json_object_payload():
+    if not request.get_data(cache=True):
+        return {}
+
+    if not request.is_json:
+        raise InvalidInputError("Request body must be valid JSON.")
+
+    try:
+        payload = request.get_json()
+    except BadRequest as error:
+        raise InvalidInputError("Request body must be valid JSON.") from error
+
+    if payload is None or not isinstance(payload, dict):
+        raise InvalidInputError("Request body must be a JSON object.")
+
+    return payload
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'ok'})
@@ -182,7 +201,12 @@ def robinhood_status():
 @app.route('/api/auth/login', methods=['POST'])
 def auth_login():
     global robinhood_auth_error, robinhood_auth_requires_mfa, pending_robinhood_login
-    payload = request.get_json(silent=True) or {}
+    try:
+        payload = get_json_object_payload()
+    except InvalidInputError as error:
+        log_api_error(error, 400)
+        return api_error(error, 400)
+
     robinhood_auth_error = None
     robinhood_auth_requires_mfa = False
     mfa_code = payload.get('mfa_code')
@@ -255,17 +279,6 @@ def get_dashboard_snapshot():
         return jsonify(fetch_dashboard_snapshot(year))
 
     return run_robinhood_request(fetch_snapshot)
-
-
-# @app.route('/routes')
-# def list_routes():
-#     import urllib
-#     output = []
-#     for rule in app.url_map.iter_rules():
-#         methods = ','.join(rule.methods)
-#         line = urllib.parse.unquote(f"{rule.endpoint:50s} {methods:20s} {rule}")
-#         output.append(line)
-#     return '<br>'.join(sorted(output))
 
 
 @app.route('/api/holdings', methods=['GET'])

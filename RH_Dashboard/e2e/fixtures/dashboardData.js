@@ -1,17 +1,4 @@
-export const monthNames = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+import { monthNames } from "../../src/test/monthNames.js";
 
 export const currentYear = new Date().getFullYear();
 
@@ -153,7 +140,7 @@ export const dashboardData = {
               expected_date: `${currentYear}-06-24`,
               amount: 86.7,
               rate: 0.94,
-              source: "estimated",
+              source: "estimate",
               label: "Estimated quarterly dividend",
             },
           ],
@@ -183,12 +170,14 @@ export const dashboardData = {
             ticker: "O",
             date: `${currentYear}-04-15`,
             amount: 18.44,
+            source: "actual",
             status: "received",
           },
           {
             ticker: "AAPL",
             date: `${currentYear}-04-18`,
             amount: 10,
+            source: "actual",
             status: "received",
           },
         ],
@@ -204,6 +193,7 @@ export const dashboardData = {
             ticker: "SCHD",
             date: `${currentYear}-06-24`,
             amount: 86.7,
+            source: "estimate",
             status: "estimated",
           },
         ],
@@ -214,15 +204,19 @@ export const dashboardData = {
   generated_at: `${currentYear}-04-28T19:30:00+00:00`,
   warnings: [
     {
-      code: "polygon-fallback",
+      code: "external_lookup_used",
       severity: "info",
       message: "Polygon fallback supplied dividend schedules for O.",
     },
   ],
   data_sources: {
-    robinhood: { enabled: true },
+    robinhood: {
+      enabled: true,
+      provides: ["portfolio_profile", "holdings", "dividend_history"],
+    },
     polygon: {
       enabled: true,
+      provides: ["dividend_schedule_fallback"],
       used_for_tickers: ["O"],
       rate_limited_tickers: [],
     },

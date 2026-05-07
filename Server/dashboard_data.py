@@ -81,7 +81,7 @@ def clear_dashboard_caches():
     polygon_request_timestamps.clear()
 
 
-def validate_year(year):
+def validate_year(year: str | int) -> str:
     year_text = str(year)
     current_year = datetime.datetime.now().year
 
@@ -97,7 +97,7 @@ def validate_year(year):
     return year_text
 
 
-def validate_ticker(ticker):
+def validate_ticker(ticker: str) -> str:
     ticker_text = str(ticker).strip().upper()
 
     if not TICKER_PATTERN.fullmatch(ticker_text):
@@ -1063,7 +1063,9 @@ def replace_year(date_value, year):
         return date_value.replace(year=year, day=28)
 
 
-def parse_date(date_text):
+def parse_date(
+    date_text: str | datetime.date | datetime.datetime | None,
+) -> datetime.date | None:
     if not date_text:
         return None
 
@@ -1073,7 +1075,7 @@ def parse_date(date_text):
         return None
 
 
-def parse_float(value):
+def parse_float(value: str | int | float | None) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -1095,12 +1097,6 @@ def get_portfolio():
     }
 
 
-def normalize_month(month):
-    if len(str(month)) != 2:
-        return month_conversion_dict[month]
-    return str(month)
-
-
 def dividends_by_month(dividend_data, year):
     year_text = validate_year(year)
     monthly_totals = {month_conversion_dict[month]: 0 for month in months}
@@ -1120,11 +1116,3 @@ def dividends_by_month(dividend_data, year):
         month: float("%.2f" % total)
         for month, total in monthly_totals.items()
     }
-
-
-def TotalDivendsForMonth(month, year, dividend_data=None):
-    if dividend_data is None:
-        dividend_data = get_dividend_records()
-
-    normalized_month = normalize_month(month)
-    return dividends_by_month(dividend_data, year)[normalized_month]

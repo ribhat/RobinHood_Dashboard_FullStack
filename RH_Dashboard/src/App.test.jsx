@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { fetchJson, postJson } from "./api";
+import { monthNames } from "./test/monthNames";
 
 vi.mock("./api", () => ({
   fetchJson: vi.fn(),
@@ -42,21 +43,6 @@ vi.mock("./Components/IncomeProjection", () => ({
 vi.mock("./Components/IncomeCalendar", () => ({
   default: () => <div data-testid="income-calendar">Income calendar</div>,
 }));
-
-const monthNames = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 const buildDashboardResponse = (year = new Date().getFullYear()) => ({
   portfolio: {
@@ -123,18 +109,21 @@ const buildDashboardResponse = (year = new Date().getFullYear()) => ({
             ticker: "SCHD",
             date: `${year}-05-01`,
             amount: 0.9,
+            source: "actual",
             status: "received",
           },
           {
             ticker: "JEPI",
             date: `${year}-05-05`,
             amount: 5.25,
+            source: "estimate",
             status: "estimated",
           },
           {
             ticker: "JEPQ",
             date: `${year}-05-05`,
             amount: 5.26,
+            source: "estimate",
             status: "estimated",
           },
         ],
@@ -158,8 +147,16 @@ const buildDashboardResponse = (year = new Date().getFullYear()) => ({
     },
   ],
   data_sources: {
-    robinhood: { enabled: true },
-    polygon: { enabled: false, used_for_tickers: [], rate_limited_tickers: [] },
+    robinhood: {
+      enabled: true,
+      provides: ["portfolio_profile", "holdings", "dividend_history"],
+    },
+    polygon: {
+      enabled: false,
+      provides: ["dividend_schedule_fallback"],
+      used_for_tickers: [],
+      rate_limited_tickers: [],
+    },
   },
   partial_data_available: true,
 });
@@ -218,6 +215,27 @@ describe("App", () => {
       screen.getByText(/Robinhood portfolio, holdings, and dividend history/i)
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reports" })).toBeDisabled();
+  });
+
+  it("resets malformed stored dashboard preferences", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    window.localStorage.setItem("rh-dashboard:preferences", "{bad-json");
+    mockAuthenticatedDashboard();
+
+    render(<App />);
+
+    await screen.findByText("Robinhood connected");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "Stored dashboard preferences were invalid and have been reset.",
+      expect.any(SyntaxError)
+    );
+    expect(JSON.parse(window.localStorage.getItem("rh-dashboard:preferences"))).toMatchObject({
+      activeView: "overview",
+      chartType: "Bar Plot",
+      comparePreviousYear: false,
+    });
+
+    warnSpy.mockRestore();
   });
 
   it("switches views and remembers dividend controls while loading comparison data", async () => {

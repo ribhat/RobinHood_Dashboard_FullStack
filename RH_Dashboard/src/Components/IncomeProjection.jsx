@@ -1,11 +1,7 @@
 import React from "react";
+import { formatShortDate } from "../formatters";
 
 const formatCurrency = (value) => `$${Number(value || 0).toFixed(2)}`;
-const formatDate = (dateText) =>
-  new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(`${dateText}T00:00:00`));
 const getPaymentDate = (payment) => payment.actual_date || payment.expected_date;
 
 const IncomeProjection = ({ data }) => {
@@ -163,7 +159,7 @@ const IncomeProjection = ({ data }) => {
                               title={payment.label}
                               key={`${position.ticker}-${getPaymentDate(payment)}-${payment.rate}-${index}`}
                             >
-                              {formatDate(getPaymentDate(payment))} {formatCurrency(payment.amount)}
+                              {formatShortDate(getPaymentDate(payment))} {formatCurrency(payment.amount)}
                             </span>
                           ))}
                         </div>

@@ -1,0 +1,57 @@
+import { fetchJson } from "./api";
+
+describe("api helpers", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns parsed JSON for successful API responses", async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('{"ok":true}'),
+    });
+
+    await expect(fetchJson("/api/example")).resolves.toEqual({ ok: true });
+  });
+
+  it("throws a clear error for invalid JSON responses", async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve("<html>not json</html>"),
+    });
+
+    await expect(fetchJson("/api/example")).rejects.toMatchObject({
+      message: "Invalid JSON response from API.",
+      status: 200,
+      responseText: "<html>not json</html>",
+    });
+  });
+
+  it("preserves backend error details", async () => {
+    fetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            error: "MFA required",
+            code: "mfa_required",
+            mfa_required: true,
+          })
+        ),
+    });
+
+    await expect(fetchJson("/api/auth/login")).rejects.toMatchObject({
+      message: "MFA required",
+      status: 409,
+      code: "mfa_required",
+      mfaRequired: true,
+    });
+  });
+});

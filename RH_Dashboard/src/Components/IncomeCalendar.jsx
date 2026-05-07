@@ -1,12 +1,7 @@
 import React, { useMemo } from "react";
+import { formatShortDate } from "../formatters";
 
 const formatCurrency = (value) => `$${Number(value || 0).toFixed(2)}`;
-
-const formatDate = (dateText) =>
-  new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(`${dateText}T00:00:00`));
 
 const getStatusLabel = (status) =>
   status === "received" ? "Received" : "Estimated";
@@ -81,7 +76,7 @@ const IncomeCalendar = ({ data }) => {
                     title={getStatusLabel(item.status)}
                   >
                     <strong>{item.ticker}</strong>
-                    <span>{formatDate(item.date)}</span>
+                    <span>{formatShortDate(item.date)}</span>
                     <span>{formatCurrency(item.amount)}</span>
                   </span>
                 ))

@@ -549,7 +549,7 @@ def logout_from_robinhood():
     try:
         robin.logout()
     except Exception:
-        pass
+        logger.warning("Robinhood logout failed.", exc_info=True)
 
 
 @contextmanager

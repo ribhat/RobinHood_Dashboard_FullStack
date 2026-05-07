@@ -19,6 +19,13 @@ import AppShell from "./Components/Shell/AppShell";
 import MetricCard from "./Components/Shell/MetricCard";
 import StatusCards from "./Components/Shell/StatusCards";
 import { fetchJson, postJson } from "./api";
+import {
+  formatCurrency,
+  formatPercent,
+  formatShortDate,
+  formatSignedCurrency,
+  getToneClass,
+} from "./formatters";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 
@@ -98,35 +105,11 @@ const getStoredDashboardPreferences = (currentYear) => {
         : defaults.chartType,
       comparePreviousYear: Boolean(storedPreferences.comparePreviousYear),
     };
-  } catch {
+  } catch (error) {
+    window.localStorage.removeItem(DASHBOARD_PREFERENCES_KEY);
+    console.warn("Stored dashboard preferences were invalid and have been reset.", error);
     return defaults;
   }
-};
-
-const hasValue = (value) => value !== null && value !== undefined;
-
-const formatCurrency = (value) =>
-  hasValue(value) ? `$${Number(value).toFixed(2)}` : "Unavailable";
-
-const formatSignedCurrency = (value) => {
-  if (!hasValue(value)) {
-    return "Unavailable";
-  }
-
-  const amount = Number(value);
-  const prefix = amount > 0 ? "+" : amount < 0 ? "-" : "";
-  return `${prefix}$${Math.abs(amount).toFixed(2)}`;
-};
-
-const formatPercent = (value) =>
-  hasValue(value) ? `${Number(value).toFixed(2)}%` : "Unavailable";
-
-const getToneClass = (value) => {
-  if (!hasValue(value) || Number(value) === 0) {
-    return "";
-  }
-
-  return Number(value) > 0 ? "positive-metric" : "negative-metric";
 };
 
 const formatGeneratedAt = (generatedAt) => {
@@ -147,12 +130,6 @@ const formatGeneratedAt = (generatedAt) => {
     minute: "2-digit",
   }).format(generatedDate);
 };
-
-const formatShortDate = (dateText) =>
-  new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(`${dateText}T00:00:00`));
 
 const getNextExpectedPaymentGroup = (months = []) => {
   const expectedPayments = months
