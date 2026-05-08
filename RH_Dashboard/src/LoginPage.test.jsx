@@ -73,4 +73,23 @@ describe("LoginPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Required")).toBeInTheDocument();
   });
+
+  it("shows a clean API response error when login returns non-JSON", async () => {
+    const user = userEvent.setup();
+    const apiError = new Error(
+      "The API returned an invalid response. Please try again."
+    );
+    apiError.code = "invalid_api_response";
+    const onLogin = vi.fn().mockRejectedValue(apiError);
+
+    render(<LoginPage onLogin={onLogin} />);
+
+    await user.type(screen.getByLabelText(/email or username/i), "user@example.com");
+    await user.type(screen.getByLabelText(/password/i), "secret-password");
+    await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(
+      await screen.findByText("The API returned an invalid response. Please try again.")
+    ).toBeInTheDocument();
+  });
 });

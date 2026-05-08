@@ -754,6 +754,14 @@ class ApiAuthTests(unittest.TestCase):
         mock_login.assert_not_called()
 
     @patch('main.login_to_robinhood')
+    def test_login_rejects_missing_credentials_without_auth_attempt(self, mock_login):
+        response = self.client.post('/api/auth/login', json={})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()['error'], 'Username and password are required.')
+        mock_login.assert_not_called()
+
+    @patch('main.login_to_robinhood')
     def test_login_failure_returns_401(self, mock_login):
         mock_login.side_effect = main.RobinhoodAuthError('bad credentials')
 
@@ -851,6 +859,27 @@ class ApiAuthTests(unittest.TestCase):
         self.assertFalse(main.is_robinhood_authenticated())
         mock_logout.assert_called_once()
         mock_clear_caches.assert_called_once()
+
+    @patch('main.clear_dashboard_caches')
+    @patch('main.logout_from_robinhood')
+    def test_logout_rejects_malformed_json_without_clearing_session(
+        self,
+        mock_logout,
+        mock_clear_caches,
+    ):
+        main.robinhood_login = {'access_token': 'token'}
+
+        response = self.client.post(
+            '/api/auth/logout',
+            data='{bad-json',
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()['error'], 'Request body must be valid JSON.')
+        self.assertTrue(main.is_robinhood_authenticated())
+        mock_logout.assert_not_called()
+        mock_clear_caches.assert_not_called()
 
     @patch('main.clear_dashboard_caches')
     @patch('main.logout_from_robinhood')

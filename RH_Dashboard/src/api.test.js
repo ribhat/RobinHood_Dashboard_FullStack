@@ -19,7 +19,7 @@ describe("api helpers", () => {
     await expect(fetchJson("/api/example")).resolves.toEqual({ ok: true });
   });
 
-  it("throws a clear error for invalid JSON responses", async () => {
+  it("throws a user-friendly error for invalid JSON responses", async () => {
     fetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -27,7 +27,8 @@ describe("api helpers", () => {
     });
 
     await expect(fetchJson("/api/example")).rejects.toMatchObject({
-      message: "Invalid JSON response from API.",
+      message: "The API returned an invalid response. Please try again.",
+      code: "invalid_api_response",
       status: 200,
       responseText: "<html>not json</html>",
     });

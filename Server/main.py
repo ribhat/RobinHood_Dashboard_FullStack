@@ -216,6 +216,18 @@ def get_json_object_payload():
     return payload
 
 
+def has_login_credentials(payload):
+    username = payload.get('username')
+    password = payload.get('password')
+
+    return (
+        isinstance(username, str)
+        and bool(username.strip())
+        and isinstance(password, str)
+        and bool(password)
+    )
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'ok'})
@@ -253,13 +265,15 @@ def auth_login():
     global robinhood_auth_error, robinhood_auth_requires_mfa, pending_robinhood_login
     try:
         payload = get_json_object_payload()
+        mfa_code = payload.get('mfa_code')
+        if not (pending_robinhood_login and mfa_code) and not has_login_credentials(payload):
+            raise InvalidInputError("Username and password are required.")
     except InvalidInputError as error:
         log_api_error(error, 400)
         return api_error(error, 400)
 
     robinhood_auth_error = None
     robinhood_auth_requires_mfa = False
-    mfa_code = payload.get('mfa_code')
 
     if is_demo_credentials(payload.get('username'), payload.get('password')):
         set_demo_session()
@@ -316,6 +330,12 @@ def auth_login():
 
 @app.route('/api/auth/logout', methods=['POST'])
 def auth_logout():
+    try:
+        get_json_object_payload()
+    except InvalidInputError as error:
+        log_api_error(error, 400)
+        return api_error(error, 400)
+
     clear_robinhood_session()
     return jsonify({'authenticated': False})
 

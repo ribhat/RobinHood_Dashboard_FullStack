@@ -1,4 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const INVALID_API_RESPONSE_MESSAGE =
+  "The API returned an invalid response. Please try again.";
 
 const parseJsonResponse = async (response) => {
   const responseText = await response.text();
@@ -10,8 +12,9 @@ const parseJsonResponse = async (response) => {
   try {
     return JSON.parse(responseText);
   } catch (parseError) {
-    const error = new Error("Invalid JSON response from API.");
+    const error = new Error(INVALID_API_RESPONSE_MESSAGE);
     error.status = response.status;
+    error.code = "invalid_api_response";
     error.responseText = responseText;
     error.cause = parseError;
     throw error;
