@@ -671,6 +671,68 @@ class ApiAuthTests(unittest.TestCase):
         )
         mock_clear_caches.assert_called_once()
 
+    @patch('main.clear_dashboard_caches')
+    @patch('main.login_to_robinhood')
+    def test_demo_login_sets_demo_session_without_robinhood_auth(
+        self,
+        mock_login,
+        mock_clear_caches,
+    ):
+        response = self.client.post(
+            '/api/auth/login',
+            json={'username': 'demo@example.com', 'password': 'demo-password'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {'authenticated': True, 'mode': 'demo'},
+        )
+        self.assertTrue(main.is_robinhood_authenticated())
+        self.assertTrue(main.is_demo_session())
+        mock_login.assert_not_called()
+        mock_clear_caches.assert_called_once()
+
+    @patch('main.login_to_robinhood')
+    def test_auth_status_reports_demo_session(self, mock_login):
+        main.set_demo_session()
+
+        response = self.client.get('/api/auth/status')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {'authenticated': True, 'mode': 'demo'},
+        )
+        mock_login.assert_not_called()
+
+    @patch('main.fetch_dashboard_snapshot')
+    def test_demo_dashboard_returns_mock_data_without_robinhood_fetch(self, mock_snapshot):
+        main.set_demo_session()
+
+        response = self.client.get('/api/dashboard?year=2026')
+
+        self.assertEqual(response.status_code, 200)
+        snapshot = response.get_json()
+        self.assertEqual(snapshot['selected_year'], 2026)
+        self.assertEqual(snapshot['portfolio']['equity'], '22572.22')
+        self.assertIn('SCHD', snapshot['holdings'])
+        self.assertEqual(
+            snapshot['data_sources']['robinhood']['label'],
+            'Demo data',
+        )
+        mock_snapshot.assert_not_called()
+
+    def test_demo_yearly_dividends_returns_mock_year_data(self):
+        main.set_demo_session()
+
+        response = self.client.get('/api/dividends/yearly/2026')
+
+        self.assertEqual(response.status_code, 200)
+        summary = response.get_json()
+        self.assertEqual(summary['total'], 320.71)
+        self.assertEqual(len(summary['months']), 12)
+
     @patch('main.login_to_robinhood')
     def test_login_rejects_malformed_json_without_auth_attempt(self, mock_login):
         response = self.client.post(
@@ -788,6 +850,24 @@ class ApiAuthTests(unittest.TestCase):
         self.assertEqual(response.get_json(), {'authenticated': False})
         self.assertFalse(main.is_robinhood_authenticated())
         mock_logout.assert_called_once()
+        mock_clear_caches.assert_called_once()
+
+    @patch('main.clear_dashboard_caches')
+    @patch('main.logout_from_robinhood')
+    def test_demo_logout_clears_session_without_robinhood_logout(
+        self,
+        mock_logout,
+        mock_clear_caches,
+    ):
+        main.set_demo_session()
+
+        response = self.client.post('/api/auth/logout')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'authenticated': False})
+        self.assertFalse(main.is_robinhood_authenticated())
+        self.assertFalse(main.is_demo_session())
+        mock_logout.assert_not_called()
         mock_clear_caches.assert_called_once()
 
     @patch('main.fetch_dashboard_snapshot')

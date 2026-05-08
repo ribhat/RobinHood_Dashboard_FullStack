@@ -9,6 +9,11 @@ const MFA_CODE_REQUIRED_MESSAGE =
   "Robinhood requires an MFA code. Enter the current code, then press Log in again.";
 const MFA_PENDING_MESSAGE =
   "Robinhood is waiting for phone approval. Check your Robinhood app and approve the prompt to continue.";
+const DEMO_CREDENTIALS = {
+  username: "demo@example.com",
+  password: "demo-password",
+  mfa_code: undefined,
+};
 
 const isMfaRequiredError = (error) =>
   Boolean(
@@ -75,26 +80,20 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
     }));
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const resetLoginFeedback = () => {
     setFormError(null);
     setLoginRequiresMfa(false);
     setLoginRequiresMfaCode(false);
     setShowPendingMfaHint(false);
+  };
 
-    if (!formValues.username.trim() || !formValues.password) {
-      setFormError("Enter your Robinhood username and password.");
-      return;
-    }
+  const submitLogin = async (credentials) => {
+    resetLoginFeedback();
 
     setIsSubmitting(true);
 
     try {
-      await onLogin({
-        username: formValues.username,
-        password: formValues.password,
-        mfa_code: formValues.mfa_code.trim() || undefined,
-      });
+      await onLogin(credentials);
     } catch (loginError) {
       if (isMfaCodeRequiredError(loginError)) {
         setLoginRequiresMfaCode(true);
@@ -108,6 +107,26 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    resetLoginFeedback();
+
+    if (!formValues.username.trim() || !formValues.password) {
+      setFormError("Enter your Robinhood username and password.");
+      return;
+    }
+
+    await submitLogin({
+      username: formValues.username,
+      password: formValues.password,
+      mfa_code: formValues.mfa_code.trim() || undefined,
+    });
+  };
+
+  const handleDemoLogin = async () => {
+    await submitLogin(DEMO_CREDENTIALS);
   };
 
   return (
@@ -231,6 +250,16 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
                   : isSubmitting
                   ? "Signing in..."
                   : "Sign In"}
+              </Button>
+              <Button
+                className="login-demo-button"
+                disabled={isSubmitting}
+                onClick={handleDemoLogin}
+                type="button"
+                variant="outline-secondary"
+              >
+                <TrendingUp size={18} aria-hidden="true" />
+                Try demo dashboard
               </Button>
             </Form>
 

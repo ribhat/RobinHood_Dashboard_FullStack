@@ -20,6 +20,23 @@ describe("LoginPage", () => {
     });
   });
 
+  it("submits demo credentials from the demo dashboard button", async () => {
+    const user = userEvent.setup();
+    const onLogin = vi.fn().mockResolvedValue();
+
+    render(<LoginPage onLogin={onLogin} />);
+
+    await user.click(
+      screen.getByRole("button", { name: /try demo dashboard/i })
+    );
+
+    expect(onLogin).toHaveBeenCalledWith({
+      username: "demo@example.com",
+      password: "demo-password",
+      mfa_code: undefined,
+    });
+  });
+
   it("shows the MFA guidance when Robinhood requests verification", async () => {
     const user = userEvent.setup();
     const verificationError = new Error("MFA required");

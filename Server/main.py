@@ -17,6 +17,15 @@ from dashboard_data import (
     validate_ticker,
     validate_year,
 )
+from demo_data import (
+    get_demo_dashboard_snapshot as fetch_demo_dashboard_snapshot,
+    get_demo_dividend_projection as fetch_demo_dividend_projection,
+    get_demo_dividends as fetch_demo_dividends_data,
+    get_demo_holdings as fetch_demo_holdings_data,
+    get_demo_portfolio as fetch_demo_portfolio_data,
+    get_demo_quote as fetch_demo_quote_data,
+    get_demo_yearly_dividend_summary as fetch_demo_yearly_dividend_summary,
+)
 from robinhood_auth import (
     RobinhoodAuthError,
     RobinhoodVerificationRequired,
@@ -66,6 +75,11 @@ robinhood_login = None
 robinhood_auth_error = None
 robinhood_auth_requires_mfa = False
 pending_robinhood_login = None
+session_mode = None
+ROBINHOOD_SESSION_MODE = 'robinhood'
+DEMO_SESSION_MODE = 'demo'
+DEMO_USERNAME = 'demo@example.com'
+DEMO_PASSWORD = 'demo-password'
 MFA_REQUIRED_CODE = 'mfa_required'
 MFA_CODE_REQUIRED_CODE = 'mfa_code_required'
 MFA_REQUIRED_STATUS_MESSAGE = (
@@ -85,6 +99,22 @@ def is_robinhood_authenticated():
     return robinhood_login is not None
 
 
+def is_demo_session():
+    return (
+        is_robinhood_authenticated()
+        and session_mode == DEMO_SESSION_MODE
+        and isinstance(robinhood_login, dict)
+        and robinhood_login.get('demo') is True
+    )
+
+
+def is_demo_credentials(username, password):
+    username_text = str(username or '').strip().lower()
+    password_text = str(password or '')
+
+    return username_text == DEMO_USERNAME and password_text == DEMO_PASSWORD
+
+
 def ensure_robinhood_login():
     if robinhood_login:
         return robinhood_login
@@ -94,21 +124,38 @@ def ensure_robinhood_login():
 
 def set_robinhood_session(login_response):
     global robinhood_login, robinhood_auth_error, robinhood_auth_requires_mfa
-    global pending_robinhood_login
+    global pending_robinhood_login, session_mode
     robinhood_login = login_response
     robinhood_auth_error = None
     robinhood_auth_requires_mfa = False
     pending_robinhood_login = None
+    session_mode = ROBINHOOD_SESSION_MODE
+
+
+def set_demo_session():
+    global robinhood_login, robinhood_auth_error, robinhood_auth_requires_mfa
+    global pending_robinhood_login, session_mode
+    robinhood_login = {
+        'demo': True,
+        'username': DEMO_USERNAME,
+    }
+    robinhood_auth_error = None
+    robinhood_auth_requires_mfa = False
+    pending_robinhood_login = None
+    session_mode = DEMO_SESSION_MODE
 
 
 def clear_robinhood_session():
     global robinhood_login, robinhood_auth_error, robinhood_auth_requires_mfa
-    global pending_robinhood_login
+    global pending_robinhood_login, session_mode
+    was_demo_session = is_demo_session()
     robinhood_login = None
     robinhood_auth_error = None
     robinhood_auth_requires_mfa = False
     pending_robinhood_login = None
-    logout_from_robinhood()
+    session_mode = None
+    if not was_demo_session:
+        logout_from_robinhood()
     clear_dashboard_caches()
 
 
@@ -178,6 +225,9 @@ def health_check():
 def auth_status():
     response = {'authenticated': is_robinhood_authenticated()}
 
+    if response['authenticated'] and is_demo_session():
+        response['mode'] = DEMO_SESSION_MODE
+
     if not response['authenticated'] and robinhood_auth_error:
         response['error'] = robinhood_auth_error
         if robinhood_auth_requires_mfa:
@@ -210,6 +260,11 @@ def auth_login():
     robinhood_auth_error = None
     robinhood_auth_requires_mfa = False
     mfa_code = payload.get('mfa_code')
+
+    if is_demo_credentials(payload.get('username'), payload.get('password')):
+        set_demo_session()
+        clear_dashboard_caches()
+        return jsonify({'authenticated': True, 'mode': DEMO_SESSION_MODE})
 
     try:
         if pending_robinhood_login and mfa_code:
@@ -276,6 +331,9 @@ def get_dashboard_snapshot():
             return api_error(error, 400)
 
     def fetch_snapshot():
+        if is_demo_session():
+            return jsonify(fetch_demo_dashboard_snapshot(year))
+
         return jsonify(fetch_dashboard_snapshot(year))
 
     return run_robinhood_request(fetch_snapshot)
@@ -284,6 +342,9 @@ def get_dashboard_snapshot():
 @app.route('/api/holdings', methods=['GET'])
 def get_holdings():
     def fetch_holdings():
+        if is_demo_session():
+            return jsonify(fetch_demo_holdings_data())
+
         return jsonify(fetch_holdings_data())
 
     return run_robinhood_request(fetch_holdings)
@@ -297,6 +358,9 @@ def get_quote(ticker):
         return api_error(error, 400)
 
     def fetch_quote():
+        if is_demo_session():
+            return jsonify(fetch_demo_quote_data(ticker))
+
         return jsonify(fetch_quote_data(ticker))
 
     return run_robinhood_request(fetch_quote)
@@ -305,6 +369,9 @@ def get_quote(ticker):
 @app.route('/api/dividends', methods=['GET'])
 def get_dividends():
     def fetch_dividends():
+        if is_demo_session():
+            return jsonify(fetch_demo_dividends_data())
+
         return jsonify(fetch_dividends_data())
 
     return run_robinhood_request(fetch_dividends)
@@ -318,6 +385,9 @@ def get_yearly_dividends(year):
         return api_error(error, 400)
 
     def fetch_yearly_dividends():
+        if is_demo_session():
+            return jsonify(fetch_demo_yearly_dividend_summary(year))
+
         return jsonify(fetch_yearly_dividend_summary(year))
 
     return run_robinhood_request(fetch_yearly_dividends)
@@ -326,6 +396,9 @@ def get_yearly_dividends(year):
 @app.route('/api/dividends/projection', methods=['GET'])
 def get_dividend_projection():
     def fetch_projection():
+        if is_demo_session():
+            return jsonify(fetch_demo_dividend_projection())
+
         return jsonify(fetch_dividend_projection())
 
     return run_robinhood_request(fetch_projection)
@@ -334,6 +407,9 @@ def get_dividend_projection():
 @app.route('/api/portfolio', methods=['GET'])
 def get_portfolio():
     def fetch_portfolio():
+        if is_demo_session():
+            return jsonify(fetch_demo_portfolio_data())
+
         return jsonify(fetch_portfolio_data())
 
     return run_robinhood_request(fetch_portfolio)

@@ -2104,6 +2104,27 @@
   width: 100%;
 }
 
+.login-demo-button {
+  align-items: center;
+  border-color: #b6c3d3;
+  border-radius: 8px;
+  color: #24364b;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 0.45rem;
+  justify-content: center;
+  margin-top: 0.75rem;
+  min-height: 3rem;
+  width: 100%;
+}
+
+.login-demo-button:hover,
+.login-demo-button:focus-visible {
+  background: #edf7f4;
+  border-color: #0f8b6c;
+  color: #0b6b54;
+}
+
 .login-verification-note,
 .login-security-note {
   color: #5f6d7e;
