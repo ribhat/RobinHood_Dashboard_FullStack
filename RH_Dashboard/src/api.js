@@ -45,6 +45,8 @@ export async function fetchJson(path, options = {}) {
     error.code = data.code;
     error.mfaRequired = Boolean(data.mfa_required);
     error.mfaCodeRequired = Boolean(data.mfa_code_required);
+    error.rateLimited = response.status === 429 || data.code === "rate_limited";
+    error.retryAfter = response.headers?.get?.("Retry-After") || data.retry_after;
     throw error;
   }
 

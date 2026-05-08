@@ -15,6 +15,11 @@ import main
 import robinhood_auth
 
 
+def clear_security_state():
+    if hasattr(main, 'clear_rate_limit_state'):
+        main.clear_rate_limit_state()
+
+
 class DashboardDataTests(unittest.TestCase):
     def tearDown(self):
         dashboard_data.clear_dashboard_caches()
@@ -526,6 +531,7 @@ class DashboardDataTests(unittest.TestCase):
 
 class ApiValidationTests(unittest.TestCase):
     def setUp(self):
+        clear_security_state()
         main.robinhood_login = None
         main.robinhood_auth_error = None
         main.robinhood_auth_requires_mfa = False
@@ -533,6 +539,7 @@ class ApiValidationTests(unittest.TestCase):
         self.client = main.app.test_client()
 
     def tearDown(self):
+        clear_security_state()
         main.robinhood_login = None
         main.robinhood_auth_error = None
         main.robinhood_auth_requires_mfa = False
@@ -602,6 +609,7 @@ class ApiValidationTests(unittest.TestCase):
 
 class ApiAuthTests(unittest.TestCase):
     def setUp(self):
+        clear_security_state()
         main.robinhood_login = None
         main.robinhood_auth_error = None
         main.robinhood_auth_requires_mfa = False
@@ -609,6 +617,7 @@ class ApiAuthTests(unittest.TestCase):
         self.client = main.app.test_client()
 
     def tearDown(self):
+        clear_security_state()
         main.robinhood_login = None
         main.robinhood_auth_error = None
         main.robinhood_auth_requires_mfa = False
@@ -762,6 +771,80 @@ class ApiAuthTests(unittest.TestCase):
         mock_login.assert_not_called()
 
     @patch('main.login_to_robinhood')
+    def test_login_rejects_unexpected_json_fields_without_auth_attempt(self, mock_login):
+        response = self.client.post(
+            '/api/auth/login',
+            json={
+                'username': 'user@example.com',
+                'password': 'secret',
+                'admin': True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()['error'], 'Unexpected field(s): admin.')
+        mock_login.assert_not_called()
+
+    @patch('main.login_to_robinhood')
+    def test_login_rejects_control_characters_without_auth_attempt(self, mock_login):
+        response = self.client.post(
+            '/api/auth/login',
+            json={'username': 'user\n@example.com', 'password': 'secret'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json()['error'],
+            'Username contains unsupported characters.',
+        )
+        mock_login.assert_not_called()
+
+    @patch('main.login_to_robinhood')
+    def test_login_rejects_invalid_mfa_code_without_auth_attempt(self, mock_login):
+        response = self.client.post(
+            '/api/auth/login',
+            json={
+                'username': 'user@example.com',
+                'password': 'secret',
+                'mfa_code': '<script>',
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json()['error'],
+            'MFA code must be 4-12 letters or numbers.',
+        )
+        mock_login.assert_not_called()
+
+    @patch('main.clear_dashboard_caches')
+    @patch('main.login_to_robinhood')
+    def test_login_normalizes_username_and_mfa_code(
+        self,
+        mock_login,
+        mock_clear_caches,
+    ):
+        mock_login.return_value = {'access_token': 'token'}
+
+        response = self.client.post(
+            '/api/auth/login',
+            json={
+                'username': ' user@example.com ',
+                'password': 'secret',
+                'mfa_code': ' 123456 ',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_login.assert_called_once_with(
+            'user@example.com',
+            'secret',
+            '123456',
+            on_verification_required=ANY,
+        )
+        mock_clear_caches.assert_called_once()
+
+    @patch('main.login_to_robinhood')
     def test_login_failure_returns_401(self, mock_login):
         mock_login.side_effect = main.RobinhoodAuthError('bad credentials')
 
@@ -906,6 +989,131 @@ class ApiAuthTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertIn('Log in to Robinhood', response.get_json()['error'])
         mock_snapshot.assert_not_called()
+
+
+class ApiSecurityTests(unittest.TestCase):
+    def setUp(self):
+        clear_security_state()
+        main.robinhood_login = None
+        main.robinhood_auth_error = None
+        main.robinhood_auth_requires_mfa = False
+        main.pending_robinhood_login = None
+        self.client = main.app.test_client()
+
+    def tearDown(self):
+        clear_security_state()
+        main.robinhood_login = None
+        main.robinhood_auth_error = None
+        main.robinhood_auth_requires_mfa = False
+        main.pending_robinhood_login = None
+        dashboard_data.clear_dashboard_caches()
+
+    def test_api_responses_include_security_headers(self):
+        response = self.client.get('/api/health')
+
+        self.assertEqual(response.headers.get('X-Content-Type-Options'), 'nosniff')
+        self.assertEqual(response.headers.get('X-Frame-Options'), 'DENY')
+        self.assertEqual(response.headers.get('Referrer-Policy'), 'no-referrer')
+        self.assertEqual(response.headers.get('Cache-Control'), 'no-store')
+        self.assertIn("default-src 'none'", response.headers.get('Content-Security-Policy'))
+
+    def test_general_api_rate_limit_returns_429(self):
+        for _ in range(120):
+            response = self.client.get(
+                '/api/health',
+                environ_base={'REMOTE_ADDR': '203.0.113.10'},
+            )
+            self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(
+            '/api/health',
+            environ_base={'REMOTE_ADDR': '203.0.113.10'},
+        )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.get_json()['code'], 'rate_limited')
+        self.assertEqual(response.headers.get('Retry-After'), '60')
+
+    @patch('main.login_to_robinhood')
+    def test_login_rate_limit_returns_429_before_auth_attempt(self, mock_login):
+        mock_login.side_effect = main.RobinhoodAuthError('bad credentials')
+
+        for _ in range(5):
+            response = self.client.post(
+                '/api/auth/login',
+                json={'username': 'user@example.com', 'password': 'wrong'},
+                environ_base={'REMOTE_ADDR': '203.0.113.11'},
+            )
+            self.assertEqual(response.status_code, 401)
+
+        response = self.client.post(
+            '/api/auth/login',
+            json={'username': 'user@example.com', 'password': 'wrong'},
+            environ_base={'REMOTE_ADDR': '203.0.113.11'},
+        )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.get_json()['code'], 'rate_limited')
+        self.assertEqual(mock_login.call_count, 5)
+
+    @patch('main.login_to_robinhood')
+    def test_login_rejects_oversized_payload_without_auth_attempt(self, mock_login):
+        oversized_body = (
+            '{"username":"'
+            + ('a' * 17000)
+            + '","password":"secret"}'
+        )
+
+        response = self.client.post(
+            '/api/auth/login',
+            data=oversized_body,
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.get_json()['code'], 'payload_too_large')
+        mock_login.assert_not_called()
+
+    @patch('main.clear_dashboard_caches')
+    @patch('main.logout_from_robinhood')
+    def test_write_request_rejects_untrusted_origin_before_session_changes(
+        self,
+        mock_logout,
+        mock_clear_caches,
+    ):
+        main.robinhood_login = {'access_token': 'token'}
+
+        response = self.client.post(
+            '/api/auth/logout',
+            json={},
+            headers={'Origin': 'https://evil.example'},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json()['code'], 'forbidden_origin')
+        self.assertTrue(main.is_robinhood_authenticated())
+        mock_logout.assert_not_called()
+        mock_clear_caches.assert_not_called()
+
+    @patch('main.clear_dashboard_caches')
+    @patch('main.logout_from_robinhood')
+    def test_write_request_allows_configured_origin(
+        self,
+        mock_logout,
+        mock_clear_caches,
+    ):
+        main.robinhood_login = {'access_token': 'token'}
+
+        response = self.client.post(
+            '/api/auth/logout',
+            json={},
+            headers={'Origin': 'http://localhost:5173'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'authenticated': False})
+        mock_logout.assert_called_once()
+        mock_clear_caches.assert_called_once()
 
 
 class CorsConfigurationTests(unittest.TestCase):

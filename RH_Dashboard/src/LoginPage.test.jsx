@@ -20,6 +20,17 @@ describe("LoginPage", () => {
     });
   });
 
+  it("sets conservative input length limits on login fields", () => {
+    render(<LoginPage onLogin={vi.fn()} />);
+
+    expect(screen.getByLabelText(/email or username/i)).toHaveAttribute(
+      "maxLength",
+      "254"
+    );
+    expect(screen.getByLabelText(/password/i)).toHaveAttribute("maxLength", "256");
+    expect(screen.getByLabelText(/mfa code/i)).toHaveAttribute("maxLength", "12");
+  });
+
   it("submits demo credentials from the demo dashboard button", async () => {
     const user = userEvent.setup();
     const onLogin = vi.fn().mockResolvedValue();

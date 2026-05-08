@@ -14,6 +14,9 @@ const DEMO_CREDENTIALS = {
   password: "demo-password",
   mfa_code: undefined,
 };
+const USERNAME_MAX_LENGTH = 254;
+const PASSWORD_MAX_LENGTH = 256;
+const MFA_CODE_MAX_LENGTH = 12;
 
 const isMfaRequiredError = (error) =>
   Boolean(
@@ -194,6 +197,7 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
                   <Form.Control
                     autoComplete="username"
                     disabled={isSubmitting}
+                    maxLength={USERNAME_MAX_LENGTH}
                     name="username"
                     onChange={handleChange}
                     placeholder="Enter your email or username"
@@ -210,6 +214,7 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
                   <Form.Control
                     autoComplete="current-password"
                     disabled={isSubmitting}
+                    maxLength={PASSWORD_MAX_LENGTH}
                     name="password"
                     onChange={handleChange}
                     placeholder="Enter your password"
@@ -227,8 +232,10 @@ const LoginPage = ({ error, mfaRequired = false, onLogin }) => {
                     autoComplete="one-time-code"
                     disabled={isSubmitting}
                     inputMode="numeric"
+                    maxLength={MFA_CODE_MAX_LENGTH}
                     name="mfa_code"
                     onChange={handleChange}
+                    pattern="[A-Za-z0-9]*"
                     placeholder={loginRequiresMfaCode ? "Required" : "Only if Robinhood asks"}
                     type="text"
                     value={formValues.mfa_code}

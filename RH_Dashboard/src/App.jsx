@@ -52,6 +52,7 @@ const createDashboardIdleState = () => ({
 const DASHBOARD_PREFERENCES_KEY = "rh-dashboard:preferences";
 const DASHBOARD_VIEWS = ["overview", "portfolio", "dividends", "holdings", "analytics"];
 const CHART_TYPES = ["Bar Plot", "Scatter Plot", "Line Graph"];
+const HOLDINGS_SEARCH_MAX_LENGTH = 64;
 const PAGE_COPY = {
   overview: {
     title: "Portfolio Dashboard",
@@ -833,6 +834,7 @@ function App() {
             aria-label="Search holdings"
             className="vault-search-input"
             onChange={(event) => setHoldingsSearch(event.target.value)}
+            maxLength={HOLDINGS_SEARCH_MAX_LENGTH}
             placeholder="Search by ticker or company"
             type="search"
             value={holdingsSearch}

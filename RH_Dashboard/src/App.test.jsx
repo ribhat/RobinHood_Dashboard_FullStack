@@ -279,6 +279,10 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Holdings" }));
     expect(screen.getByTestId("holdings-table")).toHaveTextContent("SCHD");
     expect(screen.getByTestId("holdings-table")).toHaveTextContent("MSFT");
+    expect(screen.getByLabelText("Search holdings")).toHaveAttribute(
+      "maxLength",
+      "64"
+    );
 
     await user.type(screen.getByLabelText("Search holdings"), "schwab");
 

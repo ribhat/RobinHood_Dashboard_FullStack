@@ -55,4 +55,29 @@ describe("api helpers", () => {
       mfaRequired: true,
     });
   });
+
+  it("marks rate-limited API responses", async () => {
+    fetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: {
+        get: (headerName) => (headerName === "Retry-After" ? "60" : null),
+      },
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            error: "Too many API requests. Please wait before trying again.",
+            code: "rate_limited",
+          })
+        ),
+    });
+
+    await expect(fetchJson("/api/auth/login")).rejects.toMatchObject({
+      message: "Too many API requests. Please wait before trying again.",
+      status: 429,
+      code: "rate_limited",
+      rateLimited: true,
+      retryAfter: "60",
+    });
+  });
 });

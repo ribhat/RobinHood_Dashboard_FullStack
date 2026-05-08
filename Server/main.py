@@ -1,9 +1,13 @@
 import logging
+import math
 import os
+import re
+import threading
+import time
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 from dashboard_data import (
     InvalidInputError,
     clear_dashboard_caches,
@@ -38,11 +42,40 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 app.logger.setLevel(logging.INFO)
 logging.getLogger('robinhood_auth').setLevel(logging.INFO)
+MAX_API_REQUEST_BODY_BYTES = int(os.getenv('MAX_API_REQUEST_BODY_BYTES', '16384'))
+app.config['MAX_CONTENT_LENGTH'] = MAX_API_REQUEST_BODY_BYTES
 
 DEFAULT_ALLOWED_CORS_ORIGINS = (
     'http://localhost:5173',
     'http://127.0.0.1:5173',
 )
+API_RATE_LIMIT_REQUESTS = int(os.getenv('API_RATE_LIMIT_REQUESTS', '120'))
+API_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv('API_RATE_LIMIT_WINDOW_SECONDS', '60'))
+AUTH_LOGIN_RATE_LIMIT_REQUESTS = int(os.getenv('AUTH_LOGIN_RATE_LIMIT_REQUESTS', '5'))
+AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS = int(
+    os.getenv('AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS', '300')
+)
+RATE_LIMITED_ERROR_MESSAGE = (
+    'Too many API requests. Please wait before trying again.'
+)
+RATE_LIMIT_STATE = {}
+RATE_LIMIT_LOCK = threading.Lock()
+SAFE_METHODS = {'GET', 'HEAD', 'OPTIONS'}
+LOGIN_PAYLOAD_FIELDS = {'username', 'password', 'mfa_code'}
+USERNAME_MAX_LENGTH = 254
+PASSWORD_MAX_LENGTH = 256
+MFA_CODE_MAX_LENGTH = 12
+MFA_CODE_PATTERN = re.compile(r'^[A-Za-z0-9]{4,12}$')
+CONTROL_CHARACTER_PATTERN = re.compile(r'[\x00-\x1f\x7f]')
+SECURITY_HEADERS = {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': (
+        "default-src 'none'; frame-ancestors 'none'; "
+        "base-uri 'none'; form-action 'none'"
+    ),
+}
 
 
 def get_allowed_cors_origins():
@@ -178,6 +211,135 @@ def log_api_error(error, status):
     )
 
 
+def clear_rate_limit_state():
+    with RATE_LIMIT_LOCK:
+        RATE_LIMIT_STATE.clear()
+
+
+def is_rate_limit_enabled():
+    return os.getenv('RATE_LIMIT_ENABLED', 'true').strip().lower() not in {
+        '0',
+        'false',
+        'no',
+    }
+
+
+def get_client_identifier():
+    return request.remote_addr or 'unknown'
+
+
+def get_rate_limit_rule():
+    if request.path == '/api/auth/login' and request.method == 'POST':
+        return (
+            'auth_login',
+            AUTH_LOGIN_RATE_LIMIT_REQUESTS,
+            AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+        )
+
+    return (
+        'api',
+        API_RATE_LIMIT_REQUESTS,
+        API_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+
+def check_rate_limit(client_identifier, rule_name, request_limit, window_seconds):
+    now = time.monotonic()
+    window_start = now - window_seconds
+    key = (client_identifier, rule_name)
+
+    with RATE_LIMIT_LOCK:
+        timestamps = [
+            timestamp
+            for timestamp in RATE_LIMIT_STATE.get(key, [])
+            if timestamp > window_start
+        ]
+
+        if len(timestamps) >= request_limit:
+            retry_after = max(1, math.ceil(window_seconds - (now - timestamps[0])))
+            RATE_LIMIT_STATE[key] = timestamps
+            return False, retry_after
+
+        timestamps.append(now)
+        RATE_LIMIT_STATE[key] = timestamps
+        return True, None
+
+
+@app.before_request
+def enforce_trusted_origin_for_api_writes():
+    if (
+        not request.path.startswith('/api/')
+        or request.method in SAFE_METHODS
+    ):
+        return None
+
+    origin = request.headers.get('Origin')
+    if not origin or origin in get_allowed_cors_origins():
+        return None
+
+    response, status = api_error(
+        'Origin is not allowed for this API request.',
+        403,
+        code='forbidden_origin',
+    )
+    log_api_error(RuntimeError('forbidden_origin'), status)
+    return response, status
+
+
+@app.before_request
+def enforce_api_rate_limit():
+    if (
+        not request.path.startswith('/api/')
+        or request.method == 'OPTIONS'
+        or not is_rate_limit_enabled()
+    ):
+        return None
+
+    rule_name, request_limit, window_seconds = get_rate_limit_rule()
+    allowed, retry_after = check_rate_limit(
+        get_client_identifier(),
+        rule_name,
+        request_limit,
+        window_seconds,
+    )
+
+    if allowed:
+        return None
+
+    response, status = api_error(
+        RATE_LIMITED_ERROR_MESSAGE,
+        429,
+        code='rate_limited',
+        retry_after=retry_after,
+    )
+    response.headers['Retry-After'] = str(retry_after)
+    log_api_error(RuntimeError('rate_limited'), status)
+    return response, status
+
+
+@app.after_request
+def add_security_headers(response):
+    for header, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(header, value)
+
+    if request.path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+
+    return response
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_payload_too_large(error):
+    log_api_error(error, 413)
+    return api_error(
+        'Request body is too large.',
+        413,
+        code='payload_too_large',
+    )
+
+
 def run_robinhood_request(callback):
     try:
         ensure_robinhood_login()
@@ -228,6 +390,80 @@ def has_login_credentials(payload):
     )
 
 
+def contains_control_characters(value):
+    return bool(CONTROL_CHARACTER_PATTERN.search(value))
+
+
+def validate_login_text_field(value, field_name, max_length):
+    if not isinstance(value, str):
+        raise InvalidInputError("Username and password are required.")
+
+    if len(value) > max_length:
+        raise InvalidInputError(f"{field_name} is too long.")
+
+    if contains_control_characters(value):
+        raise InvalidInputError(f"{field_name} contains unsupported characters.")
+
+    return value
+
+
+def validate_mfa_code(mfa_code):
+    if mfa_code is None:
+        return None
+
+    if not isinstance(mfa_code, str):
+        raise InvalidInputError("MFA code must be 4-12 letters or numbers.")
+
+    mfa_text = mfa_code.strip()
+    if not mfa_text:
+        return None
+
+    if len(mfa_text) > MFA_CODE_MAX_LENGTH or not MFA_CODE_PATTERN.fullmatch(mfa_text):
+        raise InvalidInputError("MFA code must be 4-12 letters or numbers.")
+
+    return mfa_text
+
+
+def validate_login_payload(payload, allow_mfa_only=False):
+    unexpected_fields = sorted(set(payload) - LOGIN_PAYLOAD_FIELDS)
+    if unexpected_fields:
+        raise InvalidInputError(
+            f"Unexpected field(s): {', '.join(unexpected_fields)}."
+        )
+
+    mfa_code = validate_mfa_code(payload.get('mfa_code'))
+
+    if allow_mfa_only and mfa_code and 'username' not in payload and 'password' not in payload:
+        return {
+            'username': None,
+            'password': None,
+            'mfa_code': mfa_code,
+        }
+
+    if not has_login_credentials(payload):
+        raise InvalidInputError("Username and password are required.")
+
+    username = validate_login_text_field(
+        payload.get('username').strip(),
+        'Username',
+        USERNAME_MAX_LENGTH,
+    )
+    password = validate_login_text_field(
+        payload.get('password'),
+        'Password',
+        PASSWORD_MAX_LENGTH,
+    )
+
+    if not username or not password:
+        raise InvalidInputError("Username and password are required.")
+
+    return {
+        'username': username,
+        'password': password,
+        'mfa_code': mfa_code,
+    }
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'ok'})
@@ -265,17 +501,21 @@ def auth_login():
     global robinhood_auth_error, robinhood_auth_requires_mfa, pending_robinhood_login
     try:
         payload = get_json_object_payload()
-        mfa_code = payload.get('mfa_code')
-        if not (pending_robinhood_login and mfa_code) and not has_login_credentials(payload):
-            raise InvalidInputError("Username and password are required.")
+        login_payload = validate_login_payload(
+            payload,
+            allow_mfa_only=bool(pending_robinhood_login),
+        )
     except InvalidInputError as error:
         log_api_error(error, 400)
         return api_error(error, 400)
 
     robinhood_auth_error = None
     robinhood_auth_requires_mfa = False
+    username = login_payload.get('username')
+    password = login_payload.get('password')
+    mfa_code = login_payload.get('mfa_code')
 
-    if is_demo_credentials(payload.get('username'), payload.get('password')):
+    if is_demo_credentials(username, password):
         set_demo_session()
         clear_dashboard_caches()
         return jsonify({'authenticated': True, 'mode': DEMO_SESSION_MODE})
@@ -289,8 +529,8 @@ def auth_login():
         else:
             pending_robinhood_login = None
             login_response = login_to_robinhood(
-                payload.get('username'),
-                payload.get('password'),
+                username,
+                password,
                 mfa_code,
                 on_verification_required=mark_robinhood_mfa_required,
             )
