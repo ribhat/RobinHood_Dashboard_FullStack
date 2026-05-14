@@ -150,6 +150,9 @@ test.describe("Dividend Vault browser smoke", () => {
 
     await page.getByRole("button", { name: "Dividends" }).click();
     await expect(page.getByRole("heading", { name: "Dividends" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Dividend Dashboard" })).toBeVisible();
+    await expect(page.getByText("Forward Annual Income")).toBeVisible();
+    await expect(page.getByText("SCHD ex Jun 18")).toBeVisible();
     await page.getByLabel("Dividend chart type").selectOption("Line Graph");
     await page.getByLabel("Compare Previous Year").check();
 

@@ -2,6 +2,7 @@ import datetime
 from copy import deepcopy
 
 from Constants.constants import month_conversion_dict, months
+from dashboard_data import build_dividend_dashboard
 
 
 DEMO_HOLDINGS = {
@@ -248,6 +249,7 @@ def get_demo_income_calendar(year, income_projection=None):
         {
             "ticker": "MSFT",
             "date": f"{year_int}-03-14",
+            "eligibility_date": f"{year_int}-02-20",
             "amount": 16.50,
             "source": "actual",
             "status": "received",
@@ -255,6 +257,7 @@ def get_demo_income_calendar(year, income_projection=None):
         {
             "ticker": "SCHD",
             "date": f"{year_int}-03-25",
+            "eligibility_date": f"{year_int}-03-20",
             "amount": 19.50,
             "source": "actual",
             "status": "received",
@@ -262,6 +265,7 @@ def get_demo_income_calendar(year, income_projection=None):
         {
             "ticker": "O",
             "date": f"{year_int}-04-15",
+            "eligibility_date": f"{year_int}-03-31",
             "amount": 18.44,
             "source": "actual",
             "status": "received",
@@ -269,6 +273,7 @@ def get_demo_income_calendar(year, income_projection=None):
         {
             "ticker": "AAPL",
             "date": f"{year_int}-04-18",
+            "eligibility_date": f"{year_int}-04-10",
             "amount": 10.00,
             "source": "actual",
             "status": "received",
@@ -276,6 +281,7 @@ def get_demo_income_calendar(year, income_projection=None):
         {
             "ticker": "O",
             "date": f"{year_int}-05-15",
+            "eligibility_date": f"{year_int}-04-30",
             "amount": 18.44,
             "source": "estimate",
             "status": "estimated",
@@ -283,6 +289,7 @@ def get_demo_income_calendar(year, income_projection=None):
         {
             "ticker": "MSFT",
             "date": f"{year_int}-06-13",
+            "eligibility_date": f"{year_int}-05-16",
             "amount": 16.43,
             "source": "estimate",
             "status": "estimated",
@@ -290,6 +297,7 @@ def get_demo_income_calendar(year, income_projection=None):
         {
             "ticker": "SCHD",
             "date": f"{year_int}-06-24",
+            "eligibility_date": f"{year_int}-06-18",
             "amount": 86.70,
             "source": "estimate",
             "status": "estimated",
@@ -297,6 +305,7 @@ def get_demo_income_calendar(year, income_projection=None):
         {
             "ticker": "AAPL",
             "date": f"{year_int}-07-18",
+            "eligibility_date": f"{year_int}-07-10",
             "amount": 10.00,
             "source": "estimate",
             "status": "estimated",
@@ -344,6 +353,7 @@ def get_demo_income_calendar(year, income_projection=None):
             "next_expected_payment": {
                 "ticker": "O",
                 "date": f"{year_int}-05-15",
+                "eligibility_date": f"{year_int}-04-30",
                 "amount": 18.44,
                 "source": "estimate",
                 "status": "estimated",
@@ -428,6 +438,24 @@ def get_demo_portfolio_overview():
     }
 
 
+def get_demo_dividend_dashboard(year=None):
+    if year is None:
+        year = datetime.datetime.now().year
+
+    year_int = int(year)
+    income_projection = get_demo_dividend_projection(year_int)
+    income_calendar = get_demo_income_calendar(year_int, income_projection)
+
+    return build_dividend_dashboard(
+        get_demo_holdings(),
+        get_demo_yearly_dividend_summary(year_int),
+        get_demo_yearly_dividend_summary(year_int - 1),
+        income_projection,
+        income_calendar,
+        get_demo_portfolio_overview(),
+    )
+
+
 def get_demo_dashboard_snapshot(year=None):
     if year is None:
         year = datetime.datetime.now().year
@@ -438,6 +466,7 @@ def get_demo_dashboard_snapshot(year=None):
     return {
         "portfolio": get_demo_portfolio(),
         "portfolio_overview": get_demo_portfolio_overview(),
+        "dividend_dashboard": get_demo_dividend_dashboard(year_int),
         "holdings": get_demo_holdings(),
         "yearly_dividends": get_demo_yearly_dividend_summary(year_int),
         "income_projection": income_projection,

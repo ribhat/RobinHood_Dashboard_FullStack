@@ -24,6 +24,8 @@ POLYGON_FREE_REQUESTS_PER_MINUTE = 4
 POLYGON_REQUEST_TIMEOUT_SECONDS = 10
 TICKER_PATTERN = re.compile(r"^[A-Za-z0-9.-]{1,12}$")
 ALLOWED_INSTRUMENT_HOSTS = {"api.robinhood.com", "nummus.robinhood.com"}
+TOP_PAYER_CONCENTRATION_WARNING_PERCENT = 40
+TOP_THREE_PAYER_CONCENTRATION_WARNING_PERCENT = 80
 
 
 class InvalidInputError(ValueError):
@@ -243,12 +245,21 @@ def get_dashboard_snapshot(year=None):
     portfolio = get_portfolio()
     holdings = get_holdings()
     yearly_dividends = get_yearly_dividend_summary(year_text)
+    previous_yearly_dividends = get_yearly_dividend_summary(str(int(year_text) - 1))
     income_projection = get_dividend_projection(year_text)
     income_calendar = get_income_calendar(year_text, income_projection)
     portfolio_overview = build_portfolio_overview(
         portfolio,
         holdings,
         income_projection,
+    )
+    dividend_dashboard = build_dividend_dashboard(
+        holdings,
+        yearly_dividends,
+        previous_yearly_dividends,
+        income_projection,
+        income_calendar,
+        portfolio_overview,
     )
     warnings = build_dashboard_warnings(
         holdings,
@@ -260,6 +271,7 @@ def get_dashboard_snapshot(year=None):
     return {
         "portfolio": portfolio,
         "portfolio_overview": portfolio_overview,
+        "dividend_dashboard": dividend_dashboard,
         "holdings": holdings,
         "yearly_dividends": yearly_dividends,
         "income_projection": income_projection,
@@ -536,6 +548,311 @@ def build_portfolio_overview(portfolio, holdings, income_projection):
     }
 
 
+def build_dividend_dashboard(
+    holdings,
+    yearly_dividends,
+    previous_yearly_dividends,
+    income_projection,
+    income_calendar,
+    portfolio_overview,
+):
+    holdings = holdings or {}
+    yearly_dividends = yearly_dividends or {}
+    previous_yearly_dividends = previous_yearly_dividends or {}
+    income_projection = income_projection or {}
+    income_calendar = income_calendar or {}
+    portfolio_overview = portfolio_overview or {}
+    current_holdings_estimate = income_projection.get(
+        "current_holdings_estimate",
+        {},
+    )
+    income_calendar_summary = income_calendar.get("summary", {})
+    estimated_annual_income = parse_float(current_holdings_estimate.get("total"))
+    projected_annual_income = parse_float(
+        income_calendar_summary.get(
+            "total_projected_annual_income",
+            estimated_annual_income,
+        )
+    )
+    projected_annual_income = max(projected_annual_income, estimated_annual_income)
+    monthly_average = parse_float(current_holdings_estimate.get("monthly_average"))
+    current_year_total = parse_float(yearly_dividends.get("total"))
+    previous_year_total = parse_float(
+        previous_yearly_dividends.get(
+            "total",
+            income_projection.get("previous_year_actual_total"),
+        )
+    )
+    total_cost_basis = portfolio_overview.get("total_cost_basis")
+    yield_on_cost_percent = (
+        round_percent((estimated_annual_income / parse_float(total_cost_basis)) * 100)
+        if parse_float(total_cost_basis) > 0
+        else None
+    )
+    income_positions = build_income_position_breakdown(
+        current_holdings_estimate.get("details", []),
+        estimated_annual_income,
+    )
+    monthly_cash_flow = build_monthly_cash_flow_summary(
+        income_calendar.get("months", []),
+    )
+    months_with_income = len([
+        month for month in monthly_cash_flow if parse_float(month.get("total")) > 0
+    ])
+    modeled_position_count = int(
+        parse_float(current_holdings_estimate.get("modeled_ticker_count"))
+    )
+    position_count = int(
+        parse_float(portfolio_overview.get("position_count")) or len(holdings)
+    )
+    modeled_position_coverage_percent = (
+        round_percent((modeled_position_count / position_count) * 100)
+        if position_count > 0
+        else 0
+    )
+    year_over_year_change = current_year_total - previous_year_total
+    year_over_year_change_percent = (
+        round_percent((year_over_year_change / previous_year_total) * 100)
+        if previous_year_total > 0
+        else None
+    )
+    top_payer = income_positions[0] if income_positions else None
+    top_payer_income_share_percent = (
+        top_payer.get("income_share_percent")
+        if top_payer
+        else 0
+    )
+    top_three_income_share_percent = round_percent(
+        sum(
+            parse_float(position.get("income_share_percent"))
+            for position in income_positions[:3]
+        )
+    )
+    risk_flags = build_dividend_dashboard_risk_flags(
+        top_payer_income_share_percent,
+        top_three_income_share_percent,
+        current_holdings_estimate.get("unmodeled_tickers", []),
+        year_over_year_change,
+        months_with_income,
+        yield_on_cost_percent,
+    )
+
+    return {
+        "headline": {
+            "estimated_annual_income": round_currency(estimated_annual_income),
+            "projected_annual_income": round_currency(projected_annual_income),
+            "estimated_monthly_income": round_currency(monthly_average),
+            "year_to_date_income": round_currency(current_year_total),
+            "portfolio_yield_percent": round_percent(
+                portfolio_overview.get("estimated_dividend_yield_percent")
+            ),
+            "yield_on_cost_percent": yield_on_cost_percent,
+        },
+        "growth": {
+            "current_year": income_projection.get("current_year"),
+            "current_year_total": round_currency(current_year_total),
+            "previous_year": income_projection.get("previous_year"),
+            "previous_year_total": round_currency(previous_year_total),
+            "year_over_year_change": round_currency(year_over_year_change),
+            "year_over_year_change_percent": year_over_year_change_percent,
+            "trend": get_growth_trend(year_over_year_change, previous_year_total),
+        },
+        "income_quality": {
+            "payer_count": len(income_positions),
+            "modeled_position_count": modeled_position_count,
+            "unmodeled_position_count": len(
+                current_holdings_estimate.get("unmodeled_tickers", [])
+            ),
+            "modeled_position_coverage_percent": modeled_position_coverage_percent,
+            "months_with_income": months_with_income,
+            "monthly_income_consistency_percent": round_percent(
+                (months_with_income / 12) * 100
+            ),
+            "payment_count": sum(
+                month.get("payment_count", 0)
+                for month in monthly_cash_flow
+            ),
+            "received_payment_count": sum(
+                month.get("received_payment_count", 0)
+                for month in monthly_cash_flow
+            ),
+            "estimated_payment_count": sum(
+                month.get("estimated_payment_count", 0)
+                for month in monthly_cash_flow
+            ),
+            "next_payment": income_calendar_summary.get("next_expected_payment"),
+        },
+        "concentration": {
+            "top_payer": top_payer,
+            "top_payer_income_share_percent": top_payer_income_share_percent,
+            "top_three_income_share_percent": top_three_income_share_percent,
+            "positions": income_positions,
+        },
+        "monthly_cash_flow": monthly_cash_flow,
+        "risk_flags": risk_flags,
+        "research_checks": [
+            {
+                "label": "Income timing",
+                "status": "tracked",
+                "message": "Received and estimated pay dates are modeled from dividend history.",
+            },
+            {
+                "label": "Dividend growth",
+                "status": "tracked",
+                "message": "Year-over-year income compares selected-year dividends with the prior year.",
+            },
+            {
+                "label": "Payer concentration",
+                "status": "tracked",
+                "message": "Income share shows how dependent cash flow is on the largest payers.",
+            },
+            {
+                "label": "Payout ratio and cash-flow coverage",
+                "status": "needs_fundamental_data",
+                "message": "Issuer earnings and free-cash-flow coverage are not available from Robinhood dividend history.",
+            },
+        ],
+    }
+
+
+def build_income_position_breakdown(projection_details, estimated_annual_income):
+    positions = []
+
+    for detail in projection_details or []:
+        projected_total = parse_float(detail.get("projected_total"))
+
+        if projected_total <= 0:
+            continue
+
+        positions.append({
+            "ticker": validate_ticker(detail.get("ticker")),
+            "projected_total": round_currency(projected_total),
+            "income_share_percent": (
+                round_percent((projected_total / estimated_annual_income) * 100)
+                if estimated_annual_income > 0
+                else 0
+            ),
+            "payment_count": len(detail.get("projected_payments", [])),
+        })
+
+    return sorted(
+        positions,
+        key=lambda position: position["projected_total"],
+        reverse=True,
+    )
+
+
+def build_monthly_cash_flow_summary(months_data):
+    monthly_cash_flow = []
+
+    for month in months_data or []:
+        items = month.get("items", [])
+        payers = {
+            validate_ticker(item.get("ticker"))
+            for item in items
+            if item.get("ticker")
+        }
+        received_count = len([
+            item for item in items if item.get("status") == "received"
+        ])
+        estimated_count = len([
+            item for item in items if item.get("status") != "received"
+        ])
+
+        monthly_cash_flow.append({
+            "month": month.get("month"),
+            "month_name": month.get("month_name"),
+            "received": round_currency(month.get("received")),
+            "estimated": round_currency(month.get("estimated")),
+            "total": round_currency(month.get("total")),
+            "payer_count": len(payers),
+            "payment_count": len(items),
+            "received_payment_count": received_count,
+            "estimated_payment_count": estimated_count,
+        })
+
+    return monthly_cash_flow
+
+
+def build_dividend_dashboard_risk_flags(
+    top_payer_income_share_percent,
+    top_three_income_share_percent,
+    unmodeled_tickers,
+    year_over_year_change,
+    months_with_income,
+    yield_on_cost_percent,
+):
+    risk_flags = []
+    unmodeled_tickers = sorted(unmodeled_tickers or [])
+
+    if top_payer_income_share_percent >= TOP_PAYER_CONCENTRATION_WARNING_PERCENT:
+        risk_flags.append({
+            "code": "income_concentration",
+            "severity": "warning",
+            "message": (
+                "One holding provides "
+                f"{top_payer_income_share_percent:.2f}% of modeled dividend income."
+            ),
+        })
+
+    if top_three_income_share_percent >= TOP_THREE_PAYER_CONCENTRATION_WARNING_PERCENT:
+        risk_flags.append({
+            "code": "top_three_income_concentration",
+            "severity": "info",
+            "message": (
+                "The top three payers provide "
+                f"{top_three_income_share_percent:.2f}% of modeled dividend income."
+            ),
+        })
+
+    if unmodeled_tickers:
+        risk_flags.append({
+            "code": "unmodeled_income",
+            "severity": "warning",
+            "tickers": unmodeled_tickers,
+            "message": (
+                "Dividend income is not modeled for "
+                f"{', '.join(unmodeled_tickers)}."
+            ),
+        })
+
+    if year_over_year_change < 0:
+        risk_flags.append({
+            "code": "dividend_income_decline",
+            "severity": "warning",
+            "message": "Selected-year dividend income is below the prior year.",
+        })
+
+    if months_with_income < 6:
+        risk_flags.append({
+            "code": "lumpy_income_schedule",
+            "severity": "info",
+            "message": "Modeled income appears in fewer than six months.",
+        })
+
+    if yield_on_cost_percent is None:
+        risk_flags.append({
+            "code": "yield_on_cost_unavailable",
+            "severity": "info",
+            "message": "Yield on cost needs cost basis for the dividend-paying positions.",
+        })
+
+    return risk_flags
+
+
+def get_growth_trend(year_over_year_change, previous_year_total):
+    if previous_year_total <= 0:
+        return "new"
+
+    if year_over_year_change > 0:
+        return "up"
+
+    if year_over_year_change < 0:
+        return "down"
+
+    return "flat"
+
+
 def build_income_calendar(
     current_year,
     dividend_data,
@@ -595,13 +912,19 @@ def build_received_income_calendar_items(dividend_data, current_year, as_of_date
         if not symbol:
             continue
 
-        items.append({
+        item = {
             "ticker": symbol,
             "date": payable_date.isoformat(),
             "amount": round(amount, 2),
             "source": "actual",
             "status": "received",
-        })
+        }
+        eligibility_date = parse_date(dividend.get("ex_dividend_date"))
+
+        if eligibility_date:
+            item["eligibility_date"] = eligibility_date.isoformat()
+
+        items.append(item)
 
     return items
 
@@ -639,13 +962,19 @@ def build_estimated_income_calendar_items(
             ):
                 continue
 
-            items.append({
+            item = {
                 "ticker": ticker,
                 "date": expected_date.isoformat(),
                 "amount": round(amount, 2),
                 "source": "estimate",
                 "status": "estimated",
-            })
+            }
+            eligibility_date = parse_date(payment.get("eligibility_date"))
+
+            if eligibility_date:
+                item["eligibility_date"] = eligibility_date.isoformat()
+
+            items.append(item)
 
     return items
 

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import HoldingsPieChart, { HoldingsTable } from "./Components/HoldingsPieChart";
 import DividendChart from "./Components/DividendChart";
+import DividendDashboard from "./Components/DividendDashboard";
 import PortfolioSummary from "./Components/PortfolioSummary";
 import PortfolioOverview from "./Components/PortfolioOverview";
 import IncomeProjection from "./Components/IncomeProjection";
@@ -34,6 +35,7 @@ const createDashboardLoadingState = () => ({
   portfolioOverview: true,
   holdings: true,
   dividends: true,
+  dividendDashboard: true,
   incomeProjection: true,
   incomeCalendar: true,
   dividendComparison: false,
@@ -44,6 +46,7 @@ const createDashboardIdleState = () => ({
   portfolioOverview: false,
   holdings: false,
   dividends: false,
+  dividendDashboard: false,
   incomeProjection: false,
   incomeCalendar: false,
   dividendComparison: false,
@@ -217,6 +220,7 @@ const getPanelEmptyStateMessage = (section) => {
     dividends: "No dividend payments were found for the selected year.",
     incomeProjection: "Dividend projections need holdings and dividend history to model income.",
     incomeCalendar: "No received or estimated dividend payments are available yet.",
+    dividendDashboard: "Dividend dashboard insights need dividend history and current holdings.",
   };
 
   return messages[section] || "No dashboard data is available yet.";
@@ -284,6 +288,7 @@ function App() {
   const [yearlyDividendData, setYearlyDividendData] = useState(null);
   const [loadedDividendYear, setLoadedDividendYear] = useState(null);
   const [previousYearDividendData, setPreviousYearDividendData] = useState(null);
+  const [dividendDashboardData, setDividendDashboardData] = useState(null);
   const [incomeProjectionData, setIncomeProjectionData] = useState(null);
   const [incomeCalendarData, setIncomeCalendarData] = useState(null);
   const [dashboardMetadata, setDashboardMetadata] = useState(null);
@@ -311,6 +316,7 @@ function App() {
     setHoldingsData(data.holdings);
     setYearlyDividendData(data.yearly_dividends);
     setLoadedDividendYear(data.selected_year);
+    setDividendDashboardData(data.dividend_dashboard);
     setIncomeProjectionData(data.income_projection);
     setIncomeCalendarData(data.income_calendar);
     setDashboardMetadata({
@@ -330,6 +336,7 @@ function App() {
     setYearlyDividendData(null);
     setLoadedDividendYear(null);
     setPreviousYearDividendData(null);
+    setDividendDashboardData(null);
     setIncomeProjectionData(null);
     setIncomeCalendarData(null);
     setDashboardMetadata(null);
@@ -429,6 +436,7 @@ function App() {
         setHoldingsData(null);
         setYearlyDividendData(null);
         setLoadedDividendYear(null);
+        setDividendDashboardData(null);
         setIncomeProjectionData(null);
         setIncomeCalendarData(null);
         setErrors({
@@ -436,6 +444,7 @@ function App() {
           portfolioOverview: error.message,
           holdings: error.message,
           dividends: error.message,
+          dividendDashboard: error.message,
           incomeProjection: error.message,
           incomeCalendar: error.message,
         });
@@ -886,6 +895,13 @@ function App() {
 
   const renderDividendsView = () => (
     <div className="dashboard-view dividends-view">
+      {renderStatusCards()}
+      {renderDashboardError()}
+      {renderWarnings()}
+      {renderPanelState(
+        "dividendDashboard",
+        dividendDashboardData && <DividendDashboard data={dividendDashboardData} />
+      )}
       {renderPanelState(
         "portfolio",
         portfolioData && (

@@ -57,6 +57,81 @@ const buildDashboardResponse = (year = new Date().getFullYear()) => ({
       unavailable_position_count: 1,
     },
   },
+  dividend_dashboard: {
+    headline: {
+      estimated_annual_income: 240,
+      projected_annual_income: 260,
+      estimated_monthly_income: 20,
+      year_to_date_income: 120,
+      portfolio_yield_percent: 12,
+      yield_on_cost_percent: 16,
+    },
+    growth: {
+      current_year: year,
+      current_year_total: 120,
+      previous_year: year - 1,
+      previous_year_total: 100,
+      year_over_year_change: 20,
+      year_over_year_change_percent: 20,
+      trend: "up",
+    },
+    income_quality: {
+      payer_count: 3,
+      modeled_position_count: 3,
+      unmodeled_position_count: 1,
+      modeled_position_coverage_percent: 75,
+      months_with_income: 12,
+      monthly_income_consistency_percent: 100,
+      payment_count: 8,
+      received_payment_count: 4,
+      estimated_payment_count: 4,
+      next_payment: {
+        ticker: "SCHD",
+        date: `${year}-06-24`,
+        eligibility_date: `${year}-06-18`,
+        amount: 86.7,
+        status: "estimated",
+      },
+    },
+    concentration: {
+      top_payer: {
+        ticker: "SCHD",
+        projected_total: 120,
+        income_share_percent: 50,
+        payment_count: 4,
+      },
+      top_payer_income_share_percent: 50,
+      top_three_income_share_percent: 100,
+      positions: [
+        {
+          ticker: "SCHD",
+          projected_total: 120,
+          income_share_percent: 50,
+          payment_count: 4,
+        },
+      ],
+    },
+    monthly_cash_flow: [],
+    risk_flags: [
+      {
+        code: "income_concentration",
+        severity: "warning",
+        message: "One holding provides 50.00% of modeled dividend income.",
+      },
+    ],
+    research_checks: [
+      {
+        label: "Income timing",
+        status: "tracked",
+        message: "Received and estimated pay dates are modeled from dividend history.",
+      },
+      {
+        label: "Payout ratio and cash-flow coverage",
+        status: "needs_fundamental_data",
+        message: "Issuer earnings and free-cash-flow coverage are not available.",
+      },
+    ],
+  },
   holdings: {
     SCHD: {
       name: "Schwab US Dividend Equity ETF",
@@ -314,6 +389,22 @@ describe("App", () => {
     expect(screen.queryByText("Modeled in calendar")).not.toBeInTheDocument();
     expect(screen.queryByText("See income calendar")).not.toBeInTheDocument();
     expect(screen.queryByText("See projection")).not.toBeInTheDocument();
+  });
+
+  it("shows the complete dividend dashboard on the dividends view", async () => {
+    const user = userEvent.setup();
+    mockAuthenticatedDashboard();
+
+    render(<App />);
+
+    await screen.findByText("Robinhood connected");
+    await user.click(screen.getByRole("button", { name: "Dividends" }));
+
+    expect(screen.getByRole("heading", { name: "Dividend Dashboard" })).toBeInTheDocument();
+    expect(screen.getByText("Forward Annual Income")).toBeInTheDocument();
+    expect(screen.getByText("$240.00")).toBeInTheDocument();
+    expect(screen.getByText("SCHD ex Jun 18")).toBeInTheDocument();
+    expect(screen.getByText("One holding provides 50.00% of modeled dividend income.")).toBeInTheDocument();
   });
 
   it("refreshes the dashboard snapshot on demand", async () => {

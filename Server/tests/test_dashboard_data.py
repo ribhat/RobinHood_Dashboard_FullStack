@@ -310,6 +310,197 @@ class DashboardDataTests(unittest.TestCase):
         self.assertEqual(calendar['summary']['current_month_income'], 0)
         self.assertEqual(calendar['summary']['remaining_estimated_annual_income'], 0)
 
+    def test_income_calendar_preserves_ex_dividend_dates_when_available(self):
+        dividends = [
+            {
+                'Ticker': 'O',
+                'payable_date': '2026-04-15',
+                'ex_dividend_date': '2026-03-31',
+                'amount': '3.00',
+                'state': 'paid',
+            },
+        ]
+        projection = {
+            'current_holdings_estimate': {
+                'details': [
+                    {
+                        'ticker': 'O',
+                        'projected_payments': [
+                            {
+                                'expected_date': '2026-05-15',
+                                'eligibility_date': '2026-04-30',
+                                'amount': '3.20',
+                                'source': 'estimate',
+                            },
+                        ],
+                    },
+                ],
+            },
+        }
+
+        calendar = dashboard_data.build_income_calendar(
+            '2026',
+            dividends,
+            projection,
+            dashboard_data.parse_date('2026-04-20'),
+        )
+
+        self.assertEqual(calendar['items'][0]['eligibility_date'], '2026-03-31')
+        self.assertEqual(calendar['items'][1]['eligibility_date'], '2026-04-30')
+
+    def test_dividend_dashboard_summarizes_growth_concentration_and_quality(self):
+        current_yearly_dividends = {
+            'months': dashboard_data.months,
+            'dividends': [10] * 12,
+            'total': 120,
+        }
+        previous_yearly_dividends = {
+            'months': dashboard_data.months,
+            'dividends': [8.33] * 12,
+            'total': 100,
+        }
+        income_projection = {
+            'current_year': 2026,
+            'current_year_collected': 120,
+            'previous_year': 2025,
+            'previous_year_actual_total': 100,
+            'current_holdings_estimate': {
+                'total': 240,
+                'monthly_average': 20,
+                'modeled_ticker_count': 3,
+                'unmodeled_tickers': ['DDD'],
+                'details': [
+                    {
+                        'ticker': 'AAA',
+                        'projected_total': 120,
+                        'projected_payments': [
+                            {
+                                'expected_date': '2026-05-15',
+                                'eligibility_date': '2026-04-30',
+                                'amount': 40,
+                                'source': 'estimate',
+                            },
+                        ],
+                    },
+                    {
+                        'ticker': 'BBB',
+                        'projected_total': 84,
+                        'projected_payments': [],
+                    },
+                    {
+                        'ticker': 'CCC',
+                        'projected_total': 36,
+                        'projected_payments': [],
+                    },
+                ],
+            },
+        }
+        income_calendar = {
+            'summary': {
+                'total_projected_annual_income': 260,
+                'next_expected_payment': {
+                    'ticker': 'AAA',
+                    'date': '2026-05-15',
+                    'eligibility_date': '2026-04-30',
+                    'amount': 40,
+                    'status': 'estimated',
+                },
+            },
+            'months': [
+                {
+                    'month': f'{index + 1:02d}',
+                    'month_name': month,
+                    'received': 5,
+                    'estimated': 5,
+                    'total': 10,
+                    'items': [
+                        {
+                            'ticker': 'AAA',
+                            'amount': 10,
+                            'status': 'estimated',
+                        },
+                    ],
+                }
+                for index, month in enumerate(dashboard_data.months)
+            ],
+        }
+        overview = {
+            'total_equity': 2000,
+            'total_cost_basis': 1500,
+            'estimated_dividend_yield_percent': 12,
+            'position_count': 4,
+            'cost_basis_coverage': {
+                'coverage_percent': 100,
+            },
+        }
+
+        dividend_dashboard = dashboard_data.build_dividend_dashboard(
+            {'AAA': {}, 'BBB': {}, 'CCC': {}, 'DDD': {}},
+            current_yearly_dividends,
+            previous_yearly_dividends,
+            income_projection,
+            income_calendar,
+            overview,
+        )
+
+        self.assertEqual(dividend_dashboard['headline']['estimated_annual_income'], 240)
+        self.assertEqual(dividend_dashboard['headline']['projected_annual_income'], 260)
+        self.assertEqual(dividend_dashboard['headline']['yield_on_cost_percent'], 16)
+        self.assertEqual(dividend_dashboard['growth']['year_over_year_change'], 20)
+        self.assertEqual(dividend_dashboard['growth']['year_over_year_change_percent'], 20)
+        self.assertEqual(dividend_dashboard['income_quality']['payer_count'], 3)
+        self.assertEqual(dividend_dashboard['income_quality']['months_with_income'], 12)
+        self.assertEqual(
+            dividend_dashboard['income_quality']['modeled_position_coverage_percent'],
+            75,
+        )
+        self.assertEqual(dividend_dashboard['concentration']['top_payer']['ticker'], 'AAA')
+        self.assertEqual(dividend_dashboard['concentration']['top_payer_income_share_percent'], 50)
+        self.assertEqual(dividend_dashboard['concentration']['top_three_income_share_percent'], 100)
+        self.assertEqual(dividend_dashboard['monthly_cash_flow'][0]['payer_count'], 1)
+        self.assertEqual(dividend_dashboard['research_checks'][0]['status'], 'tracked')
+        self.assertIn(
+            'income_concentration',
+            [flag['code'] for flag in dividend_dashboard['risk_flags']],
+        )
+
+    def test_dividend_dashboard_keeps_forward_income_when_calendar_is_partial(self):
+        dividend_dashboard = dashboard_data.build_dividend_dashboard(
+            {'SCHD': {}},
+            {'months': dashboard_data.months, 'dividends': [1] * 12, 'total': 12},
+            {'months': dashboard_data.months, 'dividends': [0] * 12, 'total': 0},
+            {
+                'current_year': 2026,
+                'previous_year': 2025,
+                'current_holdings_estimate': {
+                    'total': 240,
+                    'monthly_average': 20,
+                    'modeled_ticker_count': 1,
+                    'unmodeled_tickers': [],
+                    'details': [
+                        {
+                            'ticker': 'SCHD',
+                            'projected_total': 240,
+                            'projected_payments': [],
+                        },
+                    ],
+                },
+            },
+            {
+                'summary': {
+                    'total_projected_annual_income': 40,
+                },
+                'months': [],
+            },
+            {
+                'total_equity': 1000,
+                'position_count': 1,
+                'estimated_dividend_yield_percent': 24,
+            },
+        )
+
+        self.assertEqual(dividend_dashboard['headline']['projected_annual_income'], 240)
+
     @patch.dict('os.environ', {'POLYGON_API_KEY': 'test-key'})
     @patch('dashboard_data.fetch_polygon_dividend_schedule')
     def test_current_year_position_estimate_uses_external_schedule_for_unmodeled_ticker(

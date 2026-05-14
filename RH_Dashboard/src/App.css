@@ -1932,6 +1932,275 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.dividend-dashboard {
+  display: grid;
+  gap: 1rem;
+}
+
+.dividend-dashboard-header,
+.dividend-insight-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.dividend-dashboard-header h2,
+.dividend-insight-header h3 {
+  color: #17243a;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.dividend-dashboard-metrics {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dividend-dashboard .metric-card .summary-label,
+.dividend-dashboard .metric-card .metric-footnote {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.dividend-dashboard-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dividend-insight-panel,
+.yield-on-cost-strip {
+  background: #ffffff;
+  border: 1px solid #dfe6ee;
+  border-radius: 8px;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.25rem);
+}
+
+.dividend-insight-header {
+  margin-bottom: 1rem;
+}
+
+.dividend-insight-header svg {
+  color: #0f8b6c;
+  flex: 0 0 auto;
+}
+
+.quality-stat-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.quality-stat-grid div,
+.concentration-summary {
+  background: #f8fafc;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 0.9rem;
+}
+
+.quality-stat-grid span,
+.concentration-summary span,
+.quality-payment-row span,
+.monthly-income-column span,
+.research-check-row span,
+.risk-flag span {
+  color: #667085;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.quality-stat-grid strong,
+.concentration-summary strong {
+  color: #07111f;
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.25rem, 5cqi, 1.85rem);
+  line-height: 1.05;
+  margin-top: 0.35rem;
+}
+
+.quality-cadence {
+  color: #24364b;
+  font-weight: 800;
+  margin: 1rem 0 0;
+}
+
+.quality-payment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.quality-payment-row span {
+  background: #eef6ff;
+  border: 1px solid #cce4ff;
+  border-radius: 999px;
+  color: #145ea8;
+  padding: 0.32rem 0.62rem;
+}
+
+.income-payer-list,
+.risk-flag-list,
+.research-check-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.income-payer-row {
+  align-items: center;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: minmax(4rem, 0.8fr) minmax(5rem, 1fr) auto;
+  min-width: 0;
+}
+
+.income-payer-row strong,
+.research-check-row strong,
+.risk-flag strong {
+  color: #17243a;
+  display: block;
+  font-weight: 800;
+}
+
+.income-payer-row span,
+.research-check-row span,
+.risk-flag span {
+  display: block;
+}
+
+.income-share-meter,
+.monthly-income-track {
+  background: #edf2f7;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.income-share-meter {
+  height: 0.6rem;
+}
+
+.income-share-meter div {
+  background: #0f8b6c;
+  border-radius: inherit;
+  height: 100%;
+  min-width: 0.35rem;
+}
+
+.monthly-income-panel {
+  overflow: hidden;
+}
+
+.monthly-income-grid {
+  align-items: end;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  min-height: 12.5rem;
+}
+
+.monthly-income-column {
+  align-items: center;
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  text-align: center;
+}
+
+.monthly-income-track {
+  align-items: end;
+  display: flex;
+  height: 7rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.monthly-income-track span {
+  background: linear-gradient(180deg, #0f8b6c, #145ea8);
+  border-radius: inherit;
+  display: block;
+  min-height: 0.3rem;
+  width: 100%;
+}
+
+.monthly-income-column strong {
+  color: #17243a;
+  font-size: 0.76rem;
+}
+
+.risk-flag,
+.research-check-row {
+  align-items: center;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 0.8rem;
+}
+
+.risk-flag {
+  align-items: start;
+  grid-template-columns: 5.2rem minmax(0, 1fr);
+}
+
+.risk-flag strong,
+.research-check-status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 800;
+  justify-content: center;
+  padding: 0.25rem 0.55rem;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.risk-flag-warning strong,
+.research-check-status-needs_fundamental_data {
+  background: #fff0d8;
+  color: #a35b00;
+}
+
+.risk-flag-info strong,
+.research-check-status-tracked {
+  background: #dcf6ec;
+  color: #087c5a;
+}
+
+.research-check-row > div {
+  min-width: 0;
+}
+
+.yield-on-cost-strip {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto auto minmax(0, 1fr);
+}
+
+.yield-on-cost-strip span {
+  color: #667085;
+  font-weight: 750;
+}
+
+.yield-on-cost-strip strong {
+  color: #07111f;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
 .vault-login-page {
   align-items: stretch;
   background: #f7f8fb;
@@ -2146,12 +2415,14 @@
 @media (max-width: 1180px) {
   .status-card-grid,
   .portfolio-metric-grid,
-  .summary-grid {
+  .summary-grid,
+  .dividend-dashboard-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .two-column-grid,
-  .portfolio-insight-grid {
+  .portfolio-insight-grid,
+  .dividend-dashboard-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2230,8 +2501,23 @@
   .portfolio-metric-grid,
   .summary-grid,
   .analytics-payment-cards,
+  .dividend-dashboard-metrics,
   .income-month-grid,
   .performance-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .monthly-income-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .quality-stat-grid,
+  .research-check-row,
+  .yield-on-cost-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .risk-flag {
     grid-template-columns: 1fr;
   }
 
