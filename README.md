@@ -1,21 +1,24 @@
 # Portfolio Dashboard
 
-A comprehensive web dashboard built to visualize and analyze an investment portfolio, leveraging data from Robinhood and presenting insights using React and Flask.
+A comprehensive web dashboard built to visualize and analyze an investment portfolio, leveraging data from Robinhood and presenting allocation, performance, and dividend-income insights using React and Flask.
 
-## Example View
+## Dividend Dashboard Preview
 
-![Dashboard](./Images/DashboardView.png)
+The preview below uses the built-in demo portfolio data.
+
+![Dividend dashboard preview](./Images/DashboardView.png)
 
 ## 🌟 Features
 
-- **Portfolio Allocation Pie Chart**: Get a quick snapshot of the distribution of your investments across various assets (hover for additional data).
-- **Dividend Analysis** (hover for additional data):
-  - **Bar Chart**: Visualize overall yearly dividends with a breakdown showing contributions by Month.
-  - **Scatter Plot**: Observe total dividends received each month.
-  - **Line Graph**: Track the trend of total dividends over time.
-  - **Compare to Previous Year**: Toggle this option to comparatively visualize changes between Years
-- **Interactive Elements**: Switch between different visual representations (Bar, Scatter, Line) for dividend analysis.
-- **Portfolio & Dividend Metrics**: Quick metrics showing current portfolio value and dividends received for the current month/year.
+- **Portfolio Overview**: Track total equity, unrealized gain/loss, dividend yield, largest positions, cost-basis coverage, and allocation.
+- **Dividend Dashboard**: Review forward annual income, yield on cost, year-over-year income growth, next ex-date, monthly cash-flow cadence, payer concentration, and dividend data-quality flags.
+- **Dividend Analysis**:
+  - **Bar Chart**: Visualize yearly dividends with monthly contribution breakdowns.
+  - **Scatter Plot**: Review total dividends received each month.
+  - **Line Graph**: Track dividend trends over time.
+  - **Compare to Previous Year**: Compare selected-year dividend income against the prior year.
+- **Income Projection & Calendar**: Model expected dividend payments from current holdings and combine received and estimated income into a calendar view.
+- **Demo Mode**: Explore the dashboard with sample portfolio and dividend data before connecting a Robinhood session.
 
 ## 🛠️ Tech Stack
 
@@ -33,9 +36,10 @@ A comprehensive web dashboard built to visualize and analyze an investment portf
 
 **Prerequisites**
 
-1. Python 3.x
+1. Python 3.10+ (Python 3.12 is recommended for the pinned dependency set)
 2. Pip
-3. Robinhood Account
+3. Node.js and npm
+4. Robinhood Account
 
 **Setup**
 
